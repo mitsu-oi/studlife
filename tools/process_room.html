@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="uk">
+<!-- Службова сторінка: автоматична обробка room_base_source.png →
+     даунскейл до 960×540 (½ FullHD). БЕЗ квантизації: базовий фон зберігає всі
+     деталі й тексти джерела (квантизація потрібна для дрібних донагенерованих
+     предметів — щоб пасували до бази; сам фон і є еталоном).
+     Запускається headless-браузером, скріншот вікна 960×540 і є готовим спрайтом.
+     Для ручної обробки — asset_processor.html -->
+<head>
+<meta charset="UTF-8">
+<title>process</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#f0f}
+  canvas{display:block;position:fixed;left:0;top:0}
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<script>
+const QUANTIZE = false;   // фон не квантуємо — бережемо тексти й деталі
+const N_COLORS = 48;
+
+function medianCut(pixels, n){
+  let boxes=[pixels];
+  while(boxes.length<n){
+    let bi=-1,br=-1,bc=0;
+    boxes.forEach((box,i)=>{
+      if(box.length<2) return;
+      for(let ch=0;ch<3;ch++){
+        let mn=255,mx=0;
+        for(const p of box){ if(p[ch]<mn)mn=p[ch]; if(p[ch]>mx)mx=p[ch]; }
+        if(mx-mn>br){ br=mx-mn; bi=i; bc=ch; }
+      }
+    });
+    if(bi<0) break;
+    const box=boxes[bi];
+    box.sort((a,b)=>a[bc]-b[bc]);
+    const mid=box.length>>1;
+    boxes.splice(bi,1,box.slice(0,mid),box.slice(mid));
+  }
+  return boxes.map(box=>{
+    const s=[0,0,0];
+    for(const p of box){ s[0]+=p[0]; s[1]+=p[1]; s[2]+=p[2]; }
+    return [Math.round(s[0]/box.length),Math.round(s[1]/box.length),Math.round(s[2]/box.length)];
+  });
+}
+function nearest(pal,r,g,b){
+  let bi=0,bd=1e9;
+  for(let i=0;i<pal.length;i++){
+    const d=(pal[i][0]-r)**2+(pal[i][1]-g)**2+(pal[i][2]-b)**2;
+    if(d<bd){ bd=d; bi=i; }
+  }
+  return pal[bi];
+}
+
+const img=new Image();
+img.onload=()=>{
+  const c=document.getElementById('c').getContext('2d');
+  c.imageSmoothingEnabled=true; c.imageSmoothingQuality='high';
+  c.drawImage(img,0,0,img.width,img.height,0,0,960,540);
+  if(QUANTIZE){
+    const id=c.getImageData(0,0,960,540), d=id.data;
+    const pts=[];
+    for(let i=0;i<d.length;i+=4) pts.push([d[i],d[i+1],d[i+2]]);
+    const pal=medianCut(pts.slice(),N_COLORS);
+    for(let i=0;i<d.length;i+=4){
+      const q=nearest(pal,d[i],d[i+1],d[i+2]);
+      d[i]=q[0]; d[i+1]=q[1]; d[i+2]=q[2];
+    }
+    c.putImageData(id,0,0);
+  }
+  document.title='done';
+};
+img.src='../assets/source/room_base_source.png';
+</script>
+</body>
+</html>

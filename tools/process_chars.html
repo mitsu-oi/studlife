@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uk">
+<!-- Службова сторінка: збірка спрайт-листа персонажа з ОДНОГО чи КІЛЬКОХ
+     аркушів (базові пози + цикли анімацій):
+     1) чорні смуги-letterbox стираються (тільки majже повністю темні рядки),
+     2) маджента-фон і тіні — хромакей,
+     3) пози знаходяться автоматично (зв'язні «острови» пікселів),
+     4) кожен аркуш нормалізується під свій цільовий зріст (аркуші можуть
+        бути будь-якої роздільності),
+     5) все пакується в один ряд комірок 300×344 з прозорим фоном.
+     Запуск headless-браузером з --default-background-color=00000000:
+     скріншот вікна 3000×344 = готовий спрайт-лист із прозорістю.
+     Вибір персонажа — через хеш: #main / #botan / #party -->
+<head>
+<meta charset="UTF-8">
+<title>process</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:transparent}
+  canvas{display:block;position:fixed;left:0;top:0}
+</style>
+</head>
+<body>
+<canvas id="c" width="4800" height="344"></canvas>
+<script>
+const CELL_W = 300, CELL_H = 344;
+
+// Аркуші кожного персонажа. ПОРЯДОК ВАЖЛИВИЙ — комірки йдуть підряд!
+// tallestH — ігровий розмір НАЙВИЩОЇ пози цього аркуша (стоячі — повний зріст,
+// сидячі аркуші — нижчі). Так аркуші будь-якої роздільності стають сумісними.
+// idle-аркуші прибрані (крива генерація — рішення Даші); дихання робить код
+const SOURCES = {
+  main: [ // 0-3 базові · 4-7 цикл ходьби
+    { file: 'main.char.png',      tallestH: 295 },
+    { file: 'main.move.char.png', tallestH: 295 },
+  ],
+  botan: [ // 0-3 базові · 4-7 хода · 8-9 читає · 10-11 нотує
+    { file: 'botan.char.png',       tallestH: 308 },
+    { file: 'botan.move.char.png',  tallestH: 308 },
+    { file: 'botan.shelf.char.png', tallestH: 308 },
+    { file: 'botan.write.char.png', tallestH: 308 }, // вийшла стояча поза — повний зріст
+  ],
+  party: [ // 0-3 базові · 4-7 хода · 8-9 гітара · 10-11 телефон
+    { file: 'party.char.png',        tallestH: 298 },
+    { file: 'party.move.char.png',   tallestH: 298 },
+    { file: 'party.guitar.char.png', tallestH: 197 }, // сидяча поза ~66% зросту
+    { file: 'party.phone.char.png',  tallestH: 298 },
+  ],
+};
+
+const BAR_SCAN = 80;    // у скількох крайніх рядках шукати чорні смуги-letterbox
+const MIN_AREA = 20000; // «острови» менші за це — сміття (вотермарка тощо)
+
+// маджента-фон і його тіні: червоний+синій високі, зелений явно нижчий
+function isBackdrop(r, g, b) {
+  return r > 60 && b > 60 && g < Math.min(r, b) * 0.55;
+}
+
+function loadImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = `../assets/source/characters/${file}`;
+  });
+}
+
+// аркуш → масив «шматків» (окремих поз) у нативному розмірі, з прозорістю
+function extractPieces(img) {
+  const W = img.width, H = img.height;
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const wc = work.getContext('2d');
+  wc.drawImage(img, 0, 0);
+  const id = wc.getImageData(0, 0, W, H);
+  const d = id.data;
+
+  // чорні смуги-letterbox: стираємо лише рядки, які майже повністю темні
+  const isBarRow = (y) => {
+    let dark = 0;
+    for (let x = 0; x < W; x += 4) {
+      const i = (y * W + x) * 4;
+      if (d[i] < 40 && d[i + 1] < 40 && d[i + 2] < 40) dark++;
+    }
+    return dark / (W / 4) > 0.9;
+  };
+  for (let y = 0; y < H; y++) {
+    if (y < BAR_SCAN || y > H - BAR_SCAN) {
+      if (isBarRow(y)) {
+        for (let x = 0; x < W; x++) d[(y * W + x) * 4 + 3] = 0;
+      }
+    }
+  }
+
+  // хромакей фону
+  for (let i = 0; i < d.length; i += 4) {
+    if (isBackdrop(d[i], d[i + 1], d[i + 2])) d[i + 3] = 0;
+  }
+
+  // зв'язні компоненти (флуд-філ стеком, 4-сусідність)
+  const label = new Int32Array(W * H);
+  const comps = [];
+  let nextLabel = 1;
+  const stack = [];
+  for (let p = 0; p < W * H; p++) {
+    if (label[p] !== 0 || d[p * 4 + 3] === 0) continue;
+    const comp = { id: nextLabel, area: 0, minX: W, minY: H, maxX: 0, maxY: 0 };
+    stack.length = 0;
+    stack.push(p);
+    label[p] = nextLabel;
+    while (stack.length) {
+      const q = stack.pop();
+      const qx = q % W, qy = (q / W) | 0;
+      comp.area++;
+      if (qx < comp.minX) comp.minX = qx;
+      if (qx > comp.maxX) comp.maxX = qx;
+      if (qy < comp.minY) comp.minY = qy;
+      if (qy > comp.maxY) comp.maxY = qy;
+      if (qx > 0     && !label[q - 1] && d[(q - 1) * 4 + 3]) { label[q - 1] = nextLabel; stack.push(q - 1); }
+      if (qx < W - 1 && !label[q + 1] && d[(q + 1) * 4 + 3]) { label[q + 1] = nextLabel; stack.push(q + 1); }
+      if (qy > 0     && !label[q - W] && d[(q - W) * 4 + 3]) { label[q - W] = nextLabel; stack.push(q - W); }
+      if (qy < H - 1 && !label[q + W] && d[(q + W) * 4 + 3]) { label[q + W] = nextLabel; stack.push(q + W); }
+    }
+    if (comp.area >= MIN_AREA) comps.push(comp);
+    nextLabel++;
+  }
+
+  // відкинути ЧОРНІ СИЛУЕТИ: генератор інколи додає тіньову копію персонажа.
+  // Рахуємо середню яскравість пікселів компоненти — силует майже чорний.
+  const bright = comps.map(() => ({ sum: 0, n: 0 }));
+  const compIndex = new Map(comps.map((c, i) => [c.id, i]));
+  for (let p = 0; p < W * H; p++) {
+    const idx = compIndex.get(label[p]);
+    if (idx === undefined || d[p * 4 + 3] === 0) continue;
+    bright[idx].sum += (d[p * 4] + d[p * 4 + 1] + d[p * 4 + 2]) / 3;
+    bright[idx].n++;
+  }
+  const colored = comps.filter((c, i) => bright[i].sum / bright[i].n >= 40);
+
+  colored.sort((a, b) => a.minX - b.minX); // зліва направо
+
+  wc.putImageData(id, 0, 0);
+
+  // кожна компонента → окремий канвас без пікселів чужих компонент
+  return colored.map((comp) => {
+    const bw = comp.maxX - comp.minX + 1;
+    const bh = comp.maxY - comp.minY + 1;
+    const piece = document.createElement('canvas');
+    piece.width = bw; piece.height = bh;
+    const pc = piece.getContext('2d');
+    pc.drawImage(work, comp.minX, comp.minY, bw, bh, 0, 0, bw, bh);
+    const pid = pc.getImageData(0, 0, bw, bh);
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const src = (comp.minY + y) * W + (comp.minX + x);
+        if (label[src] !== comp.id) pid.data[(y * bw + x) * 4 + 3] = 0;
+      }
+    }
+    pc.putImageData(pid, 0, 0);
+    return { canvas: piece, w: bw, h: bh };
+  });
+}
+
+// ---------- головний потік ----------
+
+const name = (location.hash || '#main').slice(1);
+const sheets = SOURCES[name] || [{ file: `${name}.char.png`, tallestH: 300 }];
+
+Promise.all(sheets.map(s => loadImage(s.file))).then((imgs) => {
+  const out = document.getElementById('c').getContext('2d');
+  out.imageSmoothingEnabled = true;
+  out.imageSmoothingQuality = 'high';
+
+  let cell = 0;
+  imgs.forEach((img, sheetIdx) => {
+    const pieces = extractPieces(img);
+    // масштаб ЦЬОГО аркуша: найвища його поза → задана ігрова висота
+    const tallest = Math.max(...pieces.map(p => p.h));
+    const scale = sheets[sheetIdx].tallestH / tallest;
+
+    for (const p of pieces) {
+      const dw = Math.round(p.w * scale);
+      const dh = Math.round(p.h * scale);
+      const dx = cell * CELL_W + Math.round((CELL_W - dw) / 2);
+      const dy = CELL_H - dh - 6;
+      out.drawImage(p.canvas, dx, dy, dw, dh);
+      cell++;
+    }
+  });
+
+  document.title = 'done:' + cell;
+});
+</script>
+</body>
+</html>

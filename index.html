@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Складнощі студентського життя</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game">
+    <!-- HUD: день, день тижня, 5 шкал -->
+    <header id="hud"></header>
+
+    <!-- Сцена кімнати (внутрішня роздільність з CONFIG, виставляє main.js) -->
+    <div id="scene-wrap">
+      <canvas id="scene" width="1672" height="941"></canvas>
+    </div>
+
+    <!-- Зона рішень: кнопка фаз, згодом картки подій (Етап 3) -->
+    <footer id="decision-zone">
+      <div class="card-placeholder">Завантаження…</div>
+    </footer>
+  </div>
+
+  <!-- Оверлей для вікон: календарик, нічний підсумок, фінал -->
+  <div id="overlay" class="hidden"></div>
+
+  <!-- Порядок важливий: стан → дані → двигуни → мешканці → сцена → UI → сусіди → цикл -->
+  <script src="js/state.js"></script>
+  <script src="data/events.js"></script>
+  <script src="data/quests.js"></script>
+  <script src="data/force_majeure.js"></script>
+  <script src="data/shopping.js"></script>
+  <script src="data/printer.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/minigames.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/boris.js"></script>
+  <script src="js/characters.js"></script>
+  <script src="js/props.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/npc.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Обробка ШІ-асетів — StudLife</title>
+<style>
+  body{background:#14121a;color:#e8e2f0;font-family:'Courier New',Courier,monospace;
+       margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+  h1{font-size:18px;margin:0}
+  .controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:center;
+            background:#211d2b;border:2px solid #3a3350;padding:10px 14px;font-size:13px}
+  .controls label{display:flex;align-items:center;gap:6px}
+  input[type=number]{width:58px;background:#14121a;color:#e8e2f0;border:1px solid #3a3350;
+                     font-family:inherit;padding:3px}
+  input[type=range]{width:120px}
+  button{background:#3a3350;color:#e8e2f0;border:1px solid #5a5080;padding:6px 14px;
+         font-family:inherit;font-size:13px;cursor:pointer}
+  button:hover{background:#4a4270}
+  #drop{border:2px dashed #5a5080;padding:30px 60px;text-align:center;color:#9a8fb0;
+        cursor:pointer;font-size:14px}
+  #drop.over{background:#211d2b;color:#ffd166}
+  .row{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .panel{display:flex;flex-direction:column;gap:6px;align-items:center;font-size:13px}
+  canvas{border:2px solid #3a3350;image-rendering:pixelated;image-rendering:crisp-edges;background:#000}
+  #src{max-width:560px;height:auto}
+  #out{width:960px;max-width:90vw}
+  .dim{color:#9a8fb0}
+</style>
+</head>
+<body>
+<h1>🛠️ Обробка ШІ-асетів: обрізка → даунскейл → квантизація</h1>
+
+<div id="drop">Перетягни сюди PNG/JPG з генератора<br>або клікни, щоб обрати файл</div>
+<input type="file" id="file" accept="image/*" style="display:none">
+
+<div class="controls">
+  <label>Обрізка (px джерела): L <input type="number" id="cl" value="0"></label>
+  <label>T <input type="number" id="ct" value="0"></label>
+  <label>R <input type="number" id="cr" value="0"></label>
+  <label>B <input type="number" id="cb" value="0"></label>
+  <label>Ціль: <input type="number" id="tw" value="480">×<input type="number" id="th" value="270"></label>
+  <label>Кольори: <input type="range" id="nc" min="8" max="64" value="48">
+         <span id="ncv">48</span></label>
+  <button id="go">Обробити ➤</button>
+  <button id="dl" disabled>⬇ Скачати PNG</button>
+</div>
+
+<div class="row">
+  <div class="panel"><canvas id="src" width="16" height="16"></canvas>
+    <span class="dim" id="srcinfo">джерело: —</span></div>
+  <div class="panel"><canvas id="out" width="480" height="270"></canvas>
+    <span class="dim" id="outinfo">результат: — (показано збільшеним ×2, пікселі як у грі)</span></div>
+</div>
+
+<div class="dim" style="max-width:900px;text-align:center;font-size:12px;line-height:1.5">
+Порада: спочатку «Обробити» без обрізки → подивись, де рамка → введи відступи → знову «Обробити».
+Квантизація (median cut) зводить тисячі відтінків ШІ до обмеженої палітри — різні генерації
+стають стилістично «однією грою». Готовий файл клади в <b>assets/sprites/</b>.
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let img=null;
+
+// ---- завантаження ----
+$('drop').onclick=()=>$('file').click();
+$('file').onchange=e=>{ if(e.target.files[0]) load(e.target.files[0]); };
+$('drop').ondragover=e=>{ e.preventDefault(); $('drop').classList.add('over'); };
+$('drop').ondragleave=()=>$('drop').classList.remove('over');
+$('drop').ondrop=e=>{ e.preventDefault(); $('drop').classList.remove('over');
+                      if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); };
+function load(file){
+  const url=URL.createObjectURL(file);
+  img=new Image();
+  img.onload=()=>{
+    const c=$('src'); c.width=img.width; c.height=img.height;
+    c.getContext('2d').drawImage(img,0,0);
+    $('srcinfo').textContent=`джерело: ${img.width}×${img.height}`;
+  };
+  img.src=url;
+}
+$('nc').oninput=()=>$('ncv').textContent=$('nc').value;
+
+// ---- median cut квантизація ----
+function medianCut(pixels,n){
+  let boxes=[pixels];
+  while(boxes.length<n){
+    // беремо коробку з найбільшим розкидом каналу
+    let bi=-1,br=-1,bc=0;
+    boxes.forEach((box,i)=>{
+      if(box.length<2) return;
+      for(let ch=0;ch<3;ch++){
+        let mn=255,mx=0;
+        for(const p of box){ if(p[ch]<mn)mn=p[ch]; if(p[ch]>mx)mx=p[ch]; }
+        if(mx-mn>br){ br=mx-mn; bi=i; bc=ch; }
+      }
+    });
+    if(bi<0) break;
+    const box=boxes[bi];
+    box.sort((a,b)=>a[bc]-b[bc]);
+    const mid=box.length>>1;
+    boxes.splice(bi,1,box.slice(0,mid),box.slice(mid));
+  }
+  // середній колір кожної коробки
+  return boxes.map(box=>{
+    const s=[0,0,0];
+    for(const p of box){ s[0]+=p[0]; s[1]+=p[1]; s[2]+=p[2]; }
+    return [Math.round(s[0]/box.length),Math.round(s[1]/box.length),Math.round(s[2]/box.length)];
+  });
+}
+function nearest(pal,r,g,b){
+  let bi=0,bd=1e9;
+  for(let i=0;i<pal.length;i++){
+    const d=(pal[i][0]-r)**2+(pal[i][1]-g)**2+(pal[i][2]-b)**2;
+    if(d<bd){ bd=d; bi=i; }
+  }
+  return pal[bi];
+}
+
+// ---- обробка ----
+$('go').onclick=()=>{
+  if(!img){ alert('Спочатку закинь картинку'); return; }
+  const cl=+$('cl').value, ct=+$('ct').value, cr=+$('cr').value, cb=+$('cb').value;
+  const tw=+$('tw').value, th=+$('th').value;
+  const sw=img.width-cl-cr, sh=img.height-ct-cb;
+
+  // 1) даунскейл зі згладжуванням (усереднення — краще для ШІ-картинок)
+  const tmp=document.createElement('canvas'); tmp.width=tw; tmp.height=th;
+  const tc=tmp.getContext('2d');
+  tc.imageSmoothingEnabled=true; tc.imageSmoothingQuality='high';
+  tc.drawImage(img,cl,ct,sw,sh,0,0,tw,th);
+
+  // 2) квантизація
+  const id=tc.getImageData(0,0,tw,th), d=id.data;
+  const pts=[];
+  for(let i=0;i<d.length;i+=4) pts.push([d[i],d[i+1],d[i+2]]);
+  const pal=medianCut(pts.slice(),+$('nc').value);
+  for(let i=0;i<d.length;i+=4){
+    const q=nearest(pal,d[i],d[i+1],d[i+2]);
+    d[i]=q[0]; d[i+1]=q[1]; d[i+2]=q[2];
+  }
+  tc.putImageData(id,0,0);
+
+  // 3) показ (канвас у реальному розмірі, CSS збільшує без розмиття)
+  const out=$('out'); out.width=tw; out.height=th;
+  out.getContext('2d').drawImage(tmp,0,0);
+  $('outinfo').textContent=`результат: ${tw}×${th}, ${pal.length} кольорів`;
+  $('dl').disabled=false;
+  $('dl').onclick=()=>{
+    const a=document.createElement('a');
+    a.download=`asset_${tw}x${th}.png`;
+    a.href=out.toDataURL('image/png');
+    a.click();
+  };
+};
+</script>
+</body>
+</html>
