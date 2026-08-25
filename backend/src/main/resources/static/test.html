@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+<meta charset="utf-8">
+<title>Перевірка реєстрації — StudLife</title>
+<!--
+  ТЕСТОВА СТОРІНКА для перевірки реєстрації й входу руками.
+
+  Лежить у папці static/ — Spring роздає такі файли сам, без жодного коду.
+  Відкривається за адресою http://localhost:8081/test.html
+
+  Зручність у тому, що сторінка живе на ТОМУ САМОМУ сервері, тому
+  браузер не сварится через CORS, і cookie з сесією працюють одразу.
+
+  Пізніше це стане основою екрана входу в самій грі.
+-->
+<style>
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #14121a; color: #e8e2f0;
+    max-width: 760px; margin: 0 auto; padding: 24px;
+    line-height: 1.5;
+  }
+  h1 { font-size: 22px; color: #ffd166; }
+  h2 { font-size: 16px; margin: 0 0 10px; color: #ffd166; }
+  .card {
+    background: #211d2b; border: 1px solid #3a3350;
+    border-radius: 10px; padding: 16px; margin-bottom: 14px;
+  }
+  label { display: block; font-size: 13px; color: #9a8fb0; margin-top: 8px; }
+  input {
+    width: 100%; padding: 9px 11px; margin-top: 3px;
+    background: #14121a; color: #e8e2f0;
+    border: 1px solid #3a3350; border-radius: 6px;
+    font-size: 15px; font-family: inherit;
+  }
+  button {
+    margin-top: 12px; margin-right: 8px; padding: 10px 18px;
+    background: #4a4270; color: #e8e2f0;
+    border: 1px solid #6a5da0; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: #5a4f88; border-color: #ffd166; }
+  button.ghost { background: transparent; }
+  #log {
+    background: #0f0d15; border: 1px solid #3a3350; border-radius: 10px;
+    padding: 14px; font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 13px; white-space: pre-wrap; word-break: break-word;
+    min-height: 90px; max-height: 340px; overflow-y: auto;
+  }
+  .ok   { color: #7fe0a0; }
+  .err  { color: #ff8c8c; }
+  .dim  { color: #9a8fb0; }
+  .hint { font-size: 12px; color: #9a8fb0; margin-top: 10px; }
+</style>
+
+<h1>🔐 Перевірка реєстрації та входу</h1>
+<p class="dim">Тут можна помацати сервер руками: створити акаунт, увійти,
+перевірити, чи він тебе пам'ятає.</p>
+
+<div class="card">
+  <h2>Створити акаунт</h2>
+  <label>Логін <small class="dim">(3–32 символи, лише латиниця, цифри, . - _)</small>
+    <input id="r-user" placeholder="напр. dasha" autocomplete="off">
+  </label>
+  <label>Пароль <small class="dim">(щонайменше 6 символів)</small>
+    <input id="r-pass" type="password" placeholder="твій пароль">
+  </label>
+  <button onclick="register()">Зареєструватись</button>
+</div>
+
+<div class="card">
+  <h2>Увійти</h2>
+  <label>Логін <input id="l-user" placeholder="логін" autocomplete="off"></label>
+  <label>Пароль <input id="l-pass" type="password" placeholder="пароль"></label>
+  <button onclick="login()">Увійти</button>
+</div>
+
+<div class="card">
+  <h2>Перевірити стан</h2>
+  <button onclick="me()">Хто я зараз?</button>
+  <button class="ghost" onclick="logout()">Вийти</button>
+  <button class="ghost" onclick="secret()">Спробувати закриту адресу</button>
+  <p class="hint">«Хто я» показує, чи сервер тебе пам'ятає. Перезавантаж
+  сторінку й натисни ще раз — має пам'ятати далі: браузер зберігає
+  «номерок» у cookie.</p>
+</div>
+
+<h2>Що відповідає сервер</h2>
+<div id="log"><span class="dim">Тут з'являтимуться відповіді…</span></div>
+
+<script>
+const API = '/api/auth';
+const logEl = document.getElementById('log');
+
+// показуємо відповідь сервера так, щоб було видно і код, і текст
+function show(title, status, data) {
+  const ok = status >= 200 && status < 300;
+  const time = new Date().toLocaleTimeString('uk-UA');
+  const body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  logEl.innerHTML =
+    `<span class="dim">${time}</span>  <b>${title}</b>\n` +
+    `<span class="${ok ? 'ok' : 'err'}">код ${status} ${ok ? '✅' : '❌'}</span>\n` +
+    `${body}\n\n` + logEl.innerHTML;
+}
+
+// спільна відправка: credentials: 'include' — щоб браузер надсилав
+// і зберігав cookie з номерком сесії (без цього сервер забуватиме нас)
+async function send(url, options = {}) {
+  const res = await fetch(url, { credentials: 'include', ...options });
+  let data;
+  try { data = await res.json(); } catch { data = '(порожня відповідь)'; }
+  return { status: res.status, data };
+}
+
+async function register() {
+  const body = {
+    username: document.getElementById('r-user').value,
+    password: document.getElementById('r-pass').value,
+  };
+  const { status, data } = await send(`${API}/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  show('РЕЄСТРАЦІЯ', status, data);
+}
+
+async function login() {
+  const body = {
+    username: document.getElementById('l-user').value,
+    password: document.getElementById('l-pass').value,
+  };
+  const { status, data } = await send(`${API}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  show('ВХІД', status, data);
+}
+
+async function me() {
+  const { status, data } = await send(`${API}/me`);
+  show('ХТО Я', status, status === 401 ? '(сервер мене не впізнає)' : data);
+}
+
+async function logout() {
+  const { status, data } = await send(`${API}/logout`, { method: 'POST' });
+  show('ВИХІД', status, status === 204 ? '(сесію закрито)' : data);
+}
+
+// перевірка, що закриті адреси справді закриті
+async function secret() {
+  const { status, data } = await send('/api/secret-test');
+  show('ЗАКРИТА АДРЕСА', status,
+    status === 401 ? '(не пускає — і правильно)' : data);
+}
+</script>
+</html>
