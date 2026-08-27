@@ -618,3 +618,274 @@ body {
   align-self: center;
 }
 .printer-emoji { font-size: 42px; }
+
+/* ============================================================
+   📱 МОБІЛЬНА ВЕРСІЯ (Етап 12.5)
+   
+   Проблема була в тому, що вся верстка розрахована на широкий
+   екран: HUD в один ряд, сцена в нативному розмірі, кнопки поруч.
+   На телефоні це обрізалось по правому краю.
+   
+   Правила нижче вмикаються АВТОМАТИЧНО, коли екран вужчий за 760px.
+   На комп'ютері нічого не змінюється — там усе лишається як було.
+   ============================================================ */
+
+@media (max-width: 760px) {
+
+  /* ---------- загальне ---------- */
+  #game {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  /* ---------- HUD ----------
+     Було: усе в один ряд → не влазило, обрізалось.
+     Стало: дозволяємо переносити на другий рядок і стискаємо все,
+     що можна: менші відступи, вужчі смужки, дрібніший шрифт. */
+  #hud {
+    padding: 6px 8px;
+    gap: 4px 10px;
+    font-size: 12px;
+    justify-content: center;
+  }
+
+  /* рядок «День 1/30 · Понеділок · Ранок» займає весь перший рядок,
+     щоб шкали не тулились до нього збоку */
+  #hud .day-info {
+    flex-basis: 100%;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  #hud .stat { gap: 3px; }
+
+  /* смужки вужчі — головне число, а не довжина смужки */
+  #hud .stat .bar { width: 34px; height: 8px; }
+
+  #hud .stat .value {
+    min-width: 2ch;
+    font-size: 12px;
+  }
+
+  /* ---------- сцена: КРУПНО, З ГОРТАННЯМ ----------
+     Кімната намальована широкою (16:9), а телефон вузький і високий.
+     Якщо вписати її у ширину — виходить дрібна смужка, де не роздивитись
+     ні облич, ні деталей.
+
+     Тому робимо навпаки: сцена на всю доступну ВИСОТУ, а вбік її можна
+     гортати пальцем. Так кімната велика, а Ботан ліворуч і гравець
+     праворуч — за один рух пальця.
+
+     Кліки від цього не страждають: координати рахуються від положення
+     полотна на екрані (getBoundingClientRect), тож прокрутка враховується
+     сама собою. */
+  #scene-wrap {
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: flex-start;   /* потрібно, щоб прокрутка працювала */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;   /* плавна інерція на iPhone */
+    scrollbar-width: none;               /* смуга прокрутки не потрібна */
+  }
+  #scene-wrap::-webkit-scrollbar { display: none; }
+
+  /* ⚠️ Тост мусить «відчепитись» від сцени.
+     Він висить усередині #scene-wrap, а той тепер прокручується вбік —
+     тому підказка їхала разом із кімнатою і обрізалась об край екрана.
+     fixed прив'язує її до екрана, а не до кімнати. */
+  #toast {
+    position: fixed;
+    top: 74px;
+    left: 50%;
+    max-width: calc(100% - 24px);
+    font-size: 14px;
+    z-index: 9;
+  }
+
+  #scene {
+    /* 85%, а не 100% — сцена трохи «віддалена»: за один погляд видно
+       більший шматок кімнати, і гортати доводиться менше.
+       Хочеш ще дрібніше — зменшуй це число (75%), крупніше — збільшуй. */
+    height: 75%;
+    width: auto;
+    max-width: none;      /* дозволяємо бути ширшою за екран */
+    max-height: 100%;
+    flex: 0 0 auto;       /* не стискатись під ширину екрана */
+    border-width: 1px;
+  }
+
+  /* ---------- зона рішень ----------
+     Було: кнопки в ряд → вилазили за екран.
+     Стало: одна під одною, на всю ширину, під палець. */
+  #decision-zone {
+    padding: 14px 12px;
+    min-height: 0;
+    flex: 1 1 auto;      /* забирає весь простір, що лишився */
+    align-items: flex-start;
+    overflow-y: auto;    /* довгий текст можна прокрутити */
+  }
+
+  .card { gap: 12px; }
+
+  .card-text {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .card-choices {
+    flex-direction: column;
+    gap: 8px;
+    flex: 0 0 auto;   /* не розтягуватись на весь вільний простір */
+  }
+
+  /* Кнопка на всю ширину і не менша за 44px — стандартний мінімум,
+     щоб упевнено влучати пальцем.
+     ⚠️ flex: 0 0 auto обов'язковий: без нього кнопки в колонці
+     роздувались по висоті на пів екрана, і третя вже не влазила. */
+  .card-choices .btn,
+  .card-choices .locked-btn {
+    width: 100%;
+    align-self: stretch;
+    flex: 0 0 auto;
+    min-height: 46px;
+    height: auto;
+    padding: 11px 14px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  /* ---------- вікна (картки подій, форс-мажори, магазин) ----------
+     На телефоні модалка має займати майже весь екран,
+     інакше текст тісниться в вузькій колонці. */
+  .window {
+    max-width: 100%;
+    width: calc(100% - 16px);
+    max-height: 92vh;
+    overflow-y: auto;
+    padding: 16px 14px;
+    gap: 10px;
+  }
+
+  .window .btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .fm-text, .window p { font-size: 14px; line-height: 1.45; }
+  .window h2 { font-size: 16px; }
+
+  /* ---------- календарик ---------- */
+  .cal-cell { padding: 5px 0; font-size: 12px; }
+  .cal-head div { font-size: 9px; }
+  .cal-cross { font-size: 17px; }
+
+  /* ---------- мінігра ----------
+     Поле гри ширше за екран — стискаємо пропорційно. */
+  #run-canvas {
+    width: 100%;
+    height: auto;
+  }
+  .arcade-menu, .arcade-game { max-width: 100%; }
+  .arcade-score { font-size: 28px; }
+
+  /* ---------- чит-панель ----------
+     На телефоні вона майже не потрібна (клавіатури нема),
+     але як відкриється — хай не перекриває весь екран. */
+  #cheat {
+    top: 4px;
+    right: 4px;
+    left: 4px;
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+  #cheat .cheat-row input[type=range] { width: 100%; }
+}
+
+/* ---------- дуже вузькі екрани (старі/маленькі телефони) ---------- */
+@media (max-width: 380px) {
+  /* смужки прибираємо зовсім — лишаємо іконку й число,
+     інакше HUD знову не влазить */
+  #hud .stat .bar { display: none; }
+  #hud { font-size: 11px; gap: 3px 8px; }
+  .card-text { font-size: 14px; }
+}
+
+/* ---------- 📱 картка на весь екран (ідея Даші) ----------
+   На телефоні зона рішень стає однією кнопкою, а картка
+   відкривається великим вікном — як форс-мажор. */
+
+.card-open-btn {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+}
+
+/* легке пульсування, поки картку не прочитано — щоб кнопка
+   не загубилась серед решти інтерфейсу */
+.card-open-btn.pulse {
+  animation: card-pulse 2s ease-in-out infinite;
+}
+@keyframes card-pulse {
+  0%, 100% { border-color: #6a5da0; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+  50%      { border-color: #ffd166; box-shadow: 0 3px 14px rgba(255,209,102,.35); }
+}
+
+/* саме вікно з карткою */
+.card-modal { max-width: 520px; }
+
+.card-modal .card-modal-phase {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.card-modal .fm-text {
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.card-modal .card-choices {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-modal .card-choices .btn {
+  width: 100%;
+  min-height: 48px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  /* на телефоні вікно майже на весь екран */
+  .card-modal {
+    width: calc(100% - 12px);
+    max-height: 88vh;
+  }
+
+  /* ЗОНА ВНИЗУ — ТЕЖ ФІКСОВАНА.
+     Висота стала, хай там що всередині: короткий натяк, довгий наслідок
+     чи кнопка «Далі». Довгий текст прокручується всередині, а не
+     розсовує зону — інакше сцена над нею стрибала б щоразу. */
+  #decision-zone {
+    flex: 0 0 auto;
+    height: 152px;
+    padding: 10px 12px;
+    min-height: 0;
+    overflow-y: auto;
+    align-items: center;
+  }
+}
+
+/* натяк біля кнопки на телефоні: «є нова ситуація» */
+.mobile-prompt {
+  gap: 10px;
+  align-items: center;
+}
+.card-hint {
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  font-weight: bold;
+}

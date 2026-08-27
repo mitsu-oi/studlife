@@ -14,12 +14,48 @@ window.addEventListener('error', (e) => {
   }
 });
 
+/**
+ * Показати сцену з центру (актуально на телефоні, де вона ширша за екран).
+ * На комп'ютері прокручувати нічого — функція нічого й не робить.
+ */
+function centerSceneScroll() {
+  const wrap = document.getElementById('scene-wrap');
+  if (!wrap) return;
+  // трохи зачекати, поки браузер порахує реальні розміри полотна
+  requestAnimationFrame(() => {
+    const extra = wrap.scrollWidth - wrap.clientWidth;
+    if (extra > 0) {
+      wrap.scrollLeft = extra / 2;
+      hintScrollOnce();
+    }
+  });
+}
+
+/**
+ * Підказати, що кімнату можна гортати — інакше гравець побачить лише
+ * середину і не здогадається, що ліворуч і праворуч є сусіди.
+ * Показуємо ОДИН раз за сесію, щоб не набридати.
+ */
+function hintScrollOnce() {
+  if (hintScrollOnce._done) return;
+  hintScrollOnce._done = true;
+  if (typeof showToast !== 'function') return;
+  setTimeout(() => showToast('👈 Кімнату можна гортати вбік 👉', 5000), 900);
+}
+
 function init() {
   const canvas = document.getElementById('scene');
   canvas.width = CONFIG.SCENE_WIDTH;   // роздільність задає CONFIG, не HTML
   canvas.height = CONFIG.SCENE_HEIGHT;
   ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false; // чіткі пікселі при масштабуванні
+
+  // 📱 На телефоні сцена ширша за екран (щоб кімната була велика,
+  // а не дрібною смужкою) — тож показуємо її з ЦЕНТРУ, а не з лівого
+  // краю. Інакше гравець на старті бачив би стіну з плакатами
+  // й не здогадувався, що вбік можна гортати.
+  centerSceneScroll();
+  window.addEventListener('resize', centerSceneScroll);
 
   // тест-режими обходять стартове меню
   const isTestMode = /^#(card-|fm-|calendar-|boris|finale|gameover-|chars-geo|props-geo|phase-|shop|ai|xbox)/.test(location.hash);

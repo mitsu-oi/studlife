@@ -57,10 +57,76 @@ const PHASE_QUIET = {
 };
 
 // Зона рішень: показує картку з виборами / результат вибору / спокійну фазу
+/**
+ * 📱 ЧИ ЗАРАЗ ТЕЛЕФОН.
+ *
+ * Той самий поріг, що й у стилях (@media max-width: 760px) — щоб вигляд
+ * і поведінка перемикались ОДНОЧАСНО. Якщо міняти, то в обох місцях.
+ */
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 760px)').matches;
+}
+
+/**
+ * 📱 КАРТКА НА ВЕСЬ ЕКРАН (ідея Даші).
+ *
+ * На телефоні картка в панельці внизу нікуди не годиться: сцена й так
+ * тісниться, а текст із кнопками з'їдають пів екрана. Тому там панель
+ * стає ОДНІЄЮ кнопкою, а сама картка відкривається великим вікном —
+ * так само, як уже працюють форс-мажори.
+ *
+ * Логіка вибору та сама (chooseOption), змінюється лише подача.
+ */
+function showCardModal() {
+  const card = cardState.card;
+  if (!card) return;
+
+  const buttons = card.choices.map((choice, i) => {
+    if (choice.requires && gameState.stats[choice.requires.stat] < choice.requires.gte) {
+      const icon = STAT_ICONS[choice.requires.stat];
+      return `<button class="btn locked-btn" disabled>${choice.label}
+        <span class="lock-reason">потрібно ${icon} ≥ ${choice.requires.gte}</span></button>`;
+    }
+    return `<button class="btn" data-i="${i}">${choice.label}</button>`;
+  }).join('');
+
+  showOverlay(`
+    <div class="window card-modal">
+      <div class="card-modal-phase">${PHASE_NAMES[gameState.phase]} · День ${gameState.day}</div>
+      <p class="fm-text">${card.text}</p>
+      <div class="card-choices fm-choices">${buttons}</div>
+    </div>`);
+
+  document.querySelectorAll('#overlay .btn[data-i]').forEach(btn => {
+    btn.onclick = () => {
+      // вибір зроблено — закриваємо вікно, а наслідок показуємо на місці
+      // (внизу): він короткий, і туди ж лягає кнопка «Далі»
+      hideOverlay();
+      chooseOption(Number(btn.dataset.i));
+    };
+  });
+}
+
 function renderDecisionZone() {
   const zone = document.getElementById('decision-zone');
   const card = cardState.card;
   const isNight = gameState.phase === 'night';
+
+  // 📱 ТЕЛЕФОН (макет Даші): ТЕКСТ ситуації видно одразу на місці,
+  // а під ним ОДНА кнопка, яка відкриває вікно з варіантами вибору.
+  //
+  // Чому саме так: варіантів буває три, і в панельці внизу вони з'їдають
+  // пів екрана. А сам текст ховати не можна — гравець має розуміти,
+  // що відбувається, ще до того, як щось тисне.
+  if (isMobileLayout() && card && !isNight && cardState.resolvedText === null) {
+    zone.innerHTML = `
+      <div class="card mobile-prompt">
+        <p class="card-hint">📋 ${PHASE_NAMES[gameState.phase]} · є нова ситуація</p>
+        <button class="btn card-open-btn" id="open-card">Подивитися</button>
+      </div>`;
+    document.getElementById('open-card').onclick = showCardModal;
+    return;
+  }
 
   // ніч або спокійна фаза — просто кнопка далі/спати
   if (isNight || !card) {
