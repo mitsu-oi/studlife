@@ -276,8 +276,14 @@ body {
 /* ---------- картки подій у зоні рішень ---------- */
 
 #decision-zone {
-  min-height: 124px;     /* щоб верстка менше стрибала між картками */
-  padding: 30px 40px;    /* повітря довкола тексту — не притискається до країв */
+  /* ФІКСОВАНА ВИСОТА, а не min-height.
+     Раніше зона росла під довгий текст — і сцена над нею стискалася,
+     тобто кімната стрибала після кожного вибору. Тепер висота стала:
+     довгий текст прокручується всередині, а фон лишається нерухомим. */
+  height: 172px;
+  overflow-y: auto;
+  scrollbar-width: none;          /* смуга прокрутки тут тільки муляє */
+  padding: 24px 40px;    /* повітря довкола тексту — не притискається до країв */
   background: linear-gradient(180deg, #241f30, #1b1725);
   border-radius: 10px;
 }
@@ -889,3 +895,69 @@ body {
   text-align: center;
   font-weight: bold;
 }
+
+/* ---------- 🛍️ КНОПКА МАГАЗИНУ (ідея Даші) ----------
+   Скраю екрана, доступна завжди. Не чекаємо, поки випадкова картка
+   сама запропонує купити — гравець може зайти сам і свідомо копити
+   на потрібну річ. */
+
+#shop-btn {
+  position: fixed;
+  right: 14px;
+  /* прив'язана до НИЗУ, а не до середини: ближче до зони з картками,
+     де й так рука, і не заслоняє кімнату посередині */
+  bottom: 172px;
+  z-index: 8;              /* над сценою, але під вікнами (у них 10) */
+
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+
+  background: linear-gradient(180deg, #4a4270, #35304e);
+  border: 2px solid #6a5da0;
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+#shop-btn:hover {
+  border-color: #ffd166;
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(255, 209, 102, .3);
+}
+#shop-btn:active { transform: scale(0.96); }
+
+/* коли грошей вистачає бодай на щось — кнопка легенько світиться,
+   щоб нагадати: можна себе побалувати */
+#shop-btn.can-afford {
+  animation: shop-glow 2.5s ease-in-out infinite;
+}
+@keyframes shop-glow {
+  0%, 100% { border-color: #6a5da0; }
+  50%      { border-color: #ffd166; box-shadow: 0 4px 18px rgba(255, 209, 102, .35); }
+}
+
+@media (max-width: 760px) {
+  /* на телефоні — трохи менша й вище, щоб не заважати великому пальцю
+     й не накладатись на зону з карткою */
+  #shop-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 21px;
+    right: 8px;
+    top: auto;
+    bottom: 172px;         /* якраз над зоною рішень (152px + відступ) */
+    transform: none;
+  }
+  #shop-btn:hover { transform: scale(1.08); }
+  #shop-btn:active { transform: scale(0.96); }
+  @keyframes shop-glow {
+    0%, 100% { border-color: #6a5da0; }
+    50%      { border-color: #ffd166; box-shadow: 0 4px 18px rgba(255, 209, 102, .35); }
+  }
+}
+
+#decision-zone::-webkit-scrollbar { display: none; }

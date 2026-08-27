@@ -42,6 +42,10 @@ function renderHUD() {
   }
 
   hud.innerHTML = html;
+
+  // разом зі шкалами оновлюємо й кнопку магазину: вона світиться,
+  // коли грошей вистачає бодай на найдешевшу річ
+  updateShopButton();
 }
 
 // ============================================
@@ -294,6 +298,41 @@ function showForceMajeureResult(fm, r) {
 // Модалка по центру (як форс-мажор, але приємна): вибір, що купити.
 // Дані — data/shopping.js; тригер — pickShopping у events.js.
 // fromCheat=true — відкрито з чит-панелі: закрити без просування ходу гри
+/**
+ * 🛍️ КНОПКА МАГАЗИНУ — доступна завжди (ідея Даші).
+ *
+ * Раніше покупка була справою випадку: пощастило, що картка випала при
+ * грошах. Тепер гравець може зайти сам — і тоді з'являється планування
+ * («не витрачаю на таксі, копичу на принтер»), а не саме лише везіння.
+ *
+ * Ховаємо кнопку там, де вона недоречна: у редакторах, на стартовому
+ * екрані й поки відкрите якесь вікно.
+ */
+function updateShopButton() {
+  const btn = document.getElementById('shop-btn');
+  if (!btn) return;
+
+  // Стартовий екран і всі вікна — це той самий overlay, тому одна
+  // перевірка покриває і «гра ще не почалась», і «зараз відкрито картку».
+  const overlay = document.getElementById('overlay');
+  const overlayOpen = overlay && !overlay.classList.contains('hidden');
+  const inEditor = /geo/.test(location.hash);
+
+  btn.style.display = (overlayOpen || inEditor) ? 'none' : 'block';
+
+  // світиться, коли вистачає бодай на найдешевше — делікатне нагадування
+  const cheapest = typeof SHOP_ITEMS !== 'undefined'
+    ? Math.min(...SHOP_ITEMS.filter(i => !(gameState.flags.bought || {})[i.id]).map(i => i.price))
+    : Infinity;
+  btn.classList.toggle('can-afford', gameState.stats.money >= cheapest);
+}
+
+// вішаємо обробник один раз, коли сторінка готова
+window.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('shop-btn');
+  if (btn) btn.onclick = () => showShopping(true);  // true = не просувати хід
+});
+
 function showShopping(fromCheat = false) {
   shopFromCheat = fromCheat;
   const b = boughtState();
@@ -354,10 +393,12 @@ function showOverlay(html) {
   const overlay = document.getElementById('overlay');
   overlay.innerHTML = html;
   overlay.classList.remove('hidden');
+  updateShopButton();   // ховаємо кнопку магазину, поки відкрите вікно
 }
 
 function hideOverlay() {
   document.getElementById('overlay').classList.add('hidden');
+  updateShopButton();   // вікно закрилось — кнопка знову доступна
 }
 
 // плашки змін шкал «⚡ −12 · 📚 +8» з набору ефектів (''+ якщо порожньо)
