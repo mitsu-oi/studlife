@@ -4,7 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Складнощі студентського життя</title>
-  <link rel="stylesheet" href="css/style.css">
+  <!-- ⚠️ ?v=2 — НОМЕР ВЕРСІЇ. Підніми його на одиницю ПІСЛЯ КОЖНОГО
+       оновлення гри (і тут, і в усіх <script> унизу — вони мають бути
+       з тим самим числом).
+
+       НАВІЩО: браузер зберігає файли в себе й не перепитує їх 10 хвилин
+       (так налаштовано GitHub Pages). Через це гравець після оновлення
+       бачить СТАРУ гру — саме на це ми й наступили зі вступом.
+
+       Для браузера style.css?v=2 і style.css?v=2 — РІЗНІ адреси, тож
+       нову він завантажує обов'язково. Сам файл при цьому не міняється,
+       знак питання й далі — просто позначка для браузера. -->
+  <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
   <div id="game">
@@ -32,21 +43,21 @@
   <div id="overlay" class="hidden"></div>
 
   <!-- Порядок важливий: стан → дані → двигуни → мешканці → сцена → UI → сусіди → цикл -->
-  <script src="js/state.js"></script>
-  <script src="data/events.js"></script>
-  <script src="data/quests.js"></script>
-  <script src="data/force_majeure.js"></script>
-  <script src="data/shopping.js"></script>
-  <script src="data/printer.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/minigames.js"></script>
-  <script src="js/events.js"></script>
-  <script src="js/boris.js"></script>
-  <script src="js/characters.js"></script>
-  <script src="js/props.js"></script>
-  <script src="js/scene.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/npc.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/state.js?v=2"></script>
+  <script src="data/events.js?v=2"></script>
+  <script src="data/quests.js?v=2"></script>
+  <script src="data/force_majeure.js?v=2"></script>
+  <script src="data/shopping.js?v=2"></script>
+  <script src="data/printer.js?v=2"></script>
+  <script src="js/ai.js?v=2"></script>
+  <script src="js/minigames.js?v=2"></script>
+  <script src="js/events.js?v=2"></script>
+  <script src="js/boris.js?v=2"></script>
+  <script src="js/characters.js?v=2"></script>
+  <script src="js/props.js?v=2"></script>
+  <script src="js/scene.js?v=2"></script>
+  <script src="js/ui.js?v=2"></script>
+  <script src="js/npc.js?v=2"></script>
+  <script src="js/main.js?v=2"></script>
 </body>
 </html>
