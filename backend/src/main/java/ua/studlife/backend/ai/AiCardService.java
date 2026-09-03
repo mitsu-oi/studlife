@@ -92,7 +92,7 @@ public class AiCardService {
                 .stream().map(Choice::getTopic).filter(Objects::nonNull).toList();
 
         String place = AiPrompt.placeOf(run, isWeekend);
-        AiPrompt.Topic topic = AiPrompt.pickTopic(place, recentTopics, random);
+        AiPrompt.Topic topic = AiPrompt.pickTopic(place, run.getPhase(), recentTopics, random);
         boolean followUp = !recent.isEmpty() && random.nextDouble() < followUpChance;
 
         String prompt = AiPrompt.build(run, isWeekend, recent, topic, place, followUp);
