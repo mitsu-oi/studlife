@@ -380,28 +380,38 @@
       на Етапі 15 (вибір універу) і Етапі 19 (рейтинг). Раніше — код заради коду
 - [ ] `GET /api/content/...` — довідники й картки з БД (див. Етап 18)
 
-### Етап 17.5. Викласти бекенд в інтернет ⬅️ **зараз тут**
-> Поки сервер крутиться тільки на ноуті Даші, гра на GitHub Pages до нього
-> не достукається. Без цього Етап 18 не має сенсу.
+### Етап 17.5. Викласти бекенд в інтернет ✅ (3 вересня 2026)
 
-- [ ] **База — Neon** (`neon.com`): безкоштовний план **назавжди**, без картки,
-      0.5 ГБ, засинає без запитів. ⚠️ Не Render Postgres: він **вмирає через
-      30 днів** після створення
-- [ ] **Бекенд — Render** (`render.com`), free web service: 512 МБ RAM,
-      750 год/міс, HTTPS сам. ⚠️ Засинає після 15 хв тиші, прокидається ~1 хв —
-      тому в грі обов'язковий офлайн-fallback (Етап 18)
-- [ ] `backend/Dockerfile` — Render не вміє Java «з коробки», тому пакуємо в
-      Docker: збірка Gradle'ом, запуск на тонкому JRE
-- [ ] Налаштування з **змінних оточення**, не з файлу: `DATABASE_URL`,
-      `GEMINI_API_KEY`, `ALLOWED_ORIGINS`. Секрети в git не потрапляють ніколи
-- [ ] Cookie сесії → `SameSite=None; Secure`: гра на `github.io`, сервер на
-      `onrender.com` — це РІЗНІ сайти, і без цього браузер cookie не віддасть
-- [ ] CORS: пускати лише `https://mitsu-oi.github.io` (+ localhost для розробки)
-- [ ] Прикрутити пам'ять під 512 МБ (`-XX:MaxRAMPercentage`), інакше Java
-      з'їсть усе і Render уб'є процес
+**Адреса сервера: `https://studlife-backend.onrender.com`**
 
-**DoD:** відкриваєш `https://<ім'я>.onrender.com/api/auth/me` з телефона —
-сервер відповідає (нехай і «не залогінений»), а не «сторінку не знайдено».
+- [x] **База — Neon** (проєкт `studLife`, регіон Frankfurt, база `neondb`):
+      безкоштовний план **назавжди**, без картки. ⚠️ Не Render Postgres:
+      той **вмирає через 30 днів** після створення
+- [x] ⚠️ У Neon вимкнено **Connection pooling** (адреса БЕЗ `-pooler`):
+      Flyway на час міграцій ставить замок, прив'язаний до з'єднання, а
+      посередник з'єднання підміняє — замок губиться і міграції падають
+- [x] **Бекенд — Render** (`studlife-backend`, Frankfurt, free), Root
+      Directory = `backend`, Runtime = Docker, health check `/api/health`
+- [x] `backend/Dockerfile` — multi-stage: збірка на JDK, запуск на тонкому JRE
+- [x] Налаштування зі **змінних оточення** (8 штук у Render): `DB_URL`,
+      `DB_USER`, `DB_PASSWORD`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`,
+      `COOKIE_SAMESITE=None`, `COOKIE_SECURE=true`, `SHOW_SQL=false`.
+      Секрети в git не потрапляють ніколи. `PORT` Render задає сам
+- [x] Cookie сесії → `SameSite=None; Secure` (різні сайти: `github.io` і
+      `onrender.com`); CORS — лише `https://mitsu-oi.github.io`
+- [x] Пам'ять під 512 МБ: `-XX:MaxRAMPercentage=70 -XX:+UseSerialGC`
+- [x] `/api/health` — новий ендпоінт: перевірка «сервер живий» без акаунта
+- [x] 404 більше не видає себе за 500 (`ApiExceptionHandler.handleNotFound`)
+
+**DoD виконано:** `https://studlife-backend.onrender.com/api/health` віддає
+`{"status":"ok"}`, `/api/auth/me` — чесний 401. Успішний старт сервера
+доводить і роботу бази: `ddl-auto=validate` звіряє всі таблиці з кодом.
+
+⚠️ **Знані обмеження безкоштовного тарифу** (лікуємо в Етапі 18):
+- сервер засинає після 15 хв тиші, прокидається ~1 хв → гра має смикати
+  `/api/health` на екрані входу і мати офлайн-fallback
+- сесії живуть у пам'яті → після сну всі виходять з акаунтів.
+  Лікується Spring Session JDBC (сесії в базі)
 
 ### Етап 18. Інтеграція фронта
 - [ ] Модуль `js/api.js`: **той самий інтерфейс**, що в `js/state.js`
