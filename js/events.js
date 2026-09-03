@@ -35,6 +35,10 @@ function pickCardForPhase(phase) {
     if (card.weekend === true && !isWeekend(gameState.day)) return false;
     if (card.weekend === false && isWeekend(gameState.day)) return false;
     if (!cardFitsPlace(card, phase)) return false; // не в універі — не про корпуси
+    // не раніше вказаного дня: деякі картки мають сенс лише коли гравець
+    // уже освоївся (напр. Степан пише в чат, зошит на вахті стає жартом
+    // лише після того, як ти вже стикався з поломками)
+    if (gameState.day < (card.minDay || 1)) return false;
     const lastShown = hist[card.id];
     if (card.oncePerGame && lastShown !== undefined) return false;
     if (lastShown !== undefined && gameState.day - lastShown < (card.cooldownDays || 3)) return false;
@@ -238,6 +242,10 @@ function applyChoiceObj(card, choice) {
   // звичайний або випадковий (roll) наслідок
   let effects = choice.effects;
   let result = choice.result;
+  // чи усуває цей вибір форс-мажор (див. нижче). Може бути перевизначено
+  // результатом кидка — тому окрема змінна, а не choice.resolves напряму.
+  let resolves = choice.resolves;
+
   if (choice.roll) {
     let r = Math.random();
     let outcome = choice.roll[choice.roll.length - 1];
@@ -247,6 +255,12 @@ function applyChoiceObj(card, choice) {
     }
     effects = outcome.effects;
     result = outcome.result;
+
+    // ⚠️ ВАЖЛИВО: результат кидка може САМ вирішувати, чи проблему усунуто.
+    // Без цього «записати в зошит на вахті» усувало б поламаний душ завжди —
+    // а в общазі майстер приходить за записом рідко. Тепер щасливий варіант
+    // кидка ставить resolves: true, а звичайний — ні, і проблема лишається.
+    if (outcome.resolves !== undefined) resolves = outcome.resolves;
   }
 
   for (const [stat, delta] of Object.entries(effects || {})) changeStat(stat, delta);
@@ -269,7 +283,7 @@ function applyChoiceObj(card, choice) {
   if (typeof aiNoteChoice === 'function') aiNoteChoice(card, choice);
 
   // форс-мажор: варіант з resolves — усуває проблему (слід і drain зникають)
-  if (card.forceMajeure && choice.resolves) {
+  if (card.forceMajeure && resolves) {
     const st = fmState()[card.id];
     if (st) st.active = false;
   }
