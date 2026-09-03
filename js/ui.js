@@ -657,28 +657,79 @@ const INTRO_SLIDES = [
           '30 днів до стипендії. Погнали.',
   },
   {
+    char: 'player',
     type: 'name', emoji: '🎓', title: 'А ти хто?',
     body: 'Другий курс, комп’ютерні науки. Худі, ноут, вічні дедлайни ' +
           'і кава як стиль життя.<br><br>Як тебе звати?',
   },
   {
+    // char — показуємо справжнього персонажа зі спрайта, а не емодзі:
+    // так гравець одразу впізнає, хто це, коли побачить його в кімнаті
+    char: 'botan',
     emoji: '🤓', title: 'Сусід знизу — «Ботан»',
     body: '«Вітаю. Мене звати Остап, прикладна математика, моє ліжко — нижнє. ' +
           'Будеш плавати в матаналі — кажи, поясню, файна ж наука. ' +
           'Тіко борщ мій з холодильника не руш — то святе. Приємно познайомитись, {name}.»',
   },
   {
+    char: 'party',
     emoji: '🎸', title: 'Сусід згори — «Тусовщик»',
     body: '«Йоу, {name}! Я Максім, 3 курс менеджменту, живу на верхньому ярусі. ' +
           'Гітара є, вайб є. І так, я в курсі, шо гулянка о третій ночі — ' +
           'то трохи занадто. Але ж весело буде, ти за?»',
   },
   {
+    // ⚠️ НАЙВАЖЛИВІШИЙ СЛАЙД (Етап 12.6).
+    // Проблема була в тому, що гравець міг пройти всі 30 днів і не
+    // здогадатись, що по кімнаті можна тикати. Тобто побачити половину
+    // гри й вирішити, що це проста клікалка карток.
+    type: 'tips', emoji: '👆', title: 'Кімната жива — тикай по ній',
+    body: 'Тут не лише кнопки внизу. Половина гри — у самій кімнаті:',
+    tips: [
+      { icon: '🧑‍🎓', text: '<b>Клікни сусіда</b> — заговорить. Часом попросить про послугу: ' +
+                            'допоможеш зараз — виручать перед сесією.' },
+      { icon: '🪳',   text: '<b>Тарган Борис</b> вилазить із-за меблів. Клік — і тапок полетів. ' +
+                            'Стеж за менталочкою та кімнатою,щоб він не прижився тут.' },
+      { icon: '🛍️',  text: '<b>Кнопка магазину</b> збоку — відкрита завжди. ' +
+                            'Речі лишаються в кімнаті назавжди, а деякі ще й приносять копійку.' },
+      { icon: '🪞',   text: '<b>Кімната — дзеркало.</b> Занедбаєш себе — побачиш це на підлозі. ' +
+                            'Візьмешся за розум — теж помітно.' },
+    ],
+  },
+  {
+    char: 'player',
     emoji: '🛏️', title: 'Заселяйся',
     body: 'Твоє ліжко — праворуч, під вікном. Ноут на стіл, худі на стілець. ' +
-          'Обживайся, {name}.<br><br>Місяць буде… насиченим.',
+          'Обживайся, {name}.<br><br>' +
+          'Мета проста: <b>дожити до 30-го дня</b>. Не дай жодній шкалі впасти ' +
+          'до нуля — і матимеш стипендію. Місяць буде… насиченим.',
   },
 ];
+
+/**
+ * Намалювати персонажа у вступі (замість емодзі).
+ *
+ * Спрайт-лист — це довга стрічка кадрів по 300×344. Беремо з неї
+ * ПЕРШИЙ кадр (персонаж просто стоїть) і малюємо у віконце вступу,
+ * щоб гравець одразу побачив, хто це, а не абстрактну іконку.
+ */
+function drawIntroChar(canvas, charId) {
+  const ch = typeof CHARACTERS !== 'undefined'
+    ? CHARACTERS.find(c => c.id === charId) : null;
+  if (!ch || !ch.img) return;
+
+  const draw = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    // кадр 0 — базова поза «стоїть»
+    ctx.drawImage(ch.img, 0, 0, CHAR_CELL.w, CHAR_CELL.h,
+                  0, 0, canvas.width, canvas.height);
+  };
+
+  if (ch.img.ready) draw();
+  else ch.img.addEventListener('load', draw, { once: true });
+}
 
 function showIntro(step = 0) {
   const slide = INTRO_SLIDES[step];
@@ -691,14 +742,36 @@ function showIntro(step = 0) {
          placeholder="Студент" value="${gameState.student.fullName === 'Студент' ? '' : gameState.student.fullName}">`
     : '';
 
+  // список підказок «що можна тикати» — тільки на слайді з механіками
+  const tipsHtml = slide.tips
+    ? `<ul class="intro-tips">${slide.tips.map(t =>
+        `<li><span class="intro-tip-icon">${t.icon}</span><span>${t.text}</span></li>`).join('')}</ul>`
+    : '';
+
+  // ліворуч — персонаж зі спрайта (якщо слайд про когось), інакше емодзі
+  const figure = slide.char
+    ? `<canvas class="intro-char" width="${CHAR_CELL.w}" height="${CHAR_CELL.h}"></canvas>`
+    : `<div class="intro-emoji">${slide.emoji}</div>`;
+
+  // слайд про персонажа — у два стовпчики (фігура збоку від тексту),
+  // решта — звичайним стовпчиком
   showOverlay(`
-    <div class="window intro">
-      <div class="intro-emoji">${slide.emoji}</div>
-      <h2 class="intro-title">${slide.title}</h2>
-      <p class="intro-body">${body}</p>
-      ${nameField}
-      <button class="btn" id="intro-next">${isLast ? '🚪 Заселитися ➤' : 'Далі ➤'}</button>
+    <div class="window intro ${slide.char ? 'intro-with-char' : ''}">
+      ${figure}
+      <div class="intro-content">
+        <h2 class="intro-title">${slide.title}</h2>
+        <p class="intro-body">${body}</p>
+        ${tipsHtml}
+        ${nameField}
+        <button class="btn" id="intro-next">${isLast ? '🚪 Заселитися ➤' : 'Далі ➤'}</button>
+      </div>
     </div>`);
+
+  // намалювати персонажа у віконці
+  if (slide.char) {
+    const canvas = document.querySelector('#overlay .intro-char');
+    if (canvas) drawIntroChar(canvas, slide.char);
+  }
 
   const input = document.getElementById('intro-name');
   if (input) setTimeout(() => input.focus(), 50);

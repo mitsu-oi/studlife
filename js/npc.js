@@ -140,8 +140,10 @@ function npcInteractive() {
 }
 
 // який сусід під точкою (хіт-бокс — вужчий за комірку спрайта: тіло персонажа)
+// 'player' — сам гравець: люди по ньому теж тикають, тому він відповідає
+// (див. showSelfThoughts)
 function npcAt(pos) {
-  for (const id of ['botan', 'party']) {
+  for (const id of ['botan', 'party', 'player']) {
     const ch = CHARACTERS.find(c => c.id === id);
     if (!ch || !ch.img || !ch.img.ready) continue;
     const halfW = 65, top = ch.y - 290;
@@ -167,5 +169,86 @@ window.addEventListener('click', (e) => {
   // клік по Борису — це тапок (обробляє boris.js), діалог не відкриваємо
   if (typeof borisHitTest === 'function' && borisHitTest(pos.x, pos.y)) return;
   const id = npcAt(pos);
-  if (id) openNpcDialog(id);
+  if (id === 'player') showSelfThoughts();   // тикнули по собі
+  else if (id) openNpcDialog(id);
 });
+
+/**
+ * КЛІК ПО САМОМУ СОБІ (спостереження Даші: люди тикають і на головного).
+ *
+ * Замість «нічого не відбувається» — персонаж каже, як він почувається.
+ * Це не просто пасхалка: гравець бачить, що означають шкали, живою мовою,
+ * а не самими цифрами. «⚡ 18» мало про що каже, а «очі злипаються прямо
+ * зараз» — цілком зрозуміло.
+ *
+ * Скаржиться на НАЙГІРШУ шкалу: так підказка вказує, що лагодити першим.
+ */
+function showSelfThoughts() {
+  const s = gameState.stats;
+  const name = (gameState.student && gameState.student.fullName) || 'Студент';
+
+  // репліки на кожну шкалу: перша — коли зовсім погано, друга — так собі
+  const LINES = {
+    energy: {
+      bad: ['Очі злипаються. Ще трохи — і засну прямо тут, у худі й кросівках.',
+            'Тіло каже «досить», голова каже «ще трохи». Обоє брешуть.'],
+      mid: ['Втомився, але живий. Кава ще тримає оборону.'],
+    },
+    mental: {
+      bad: ['Усе дратує: сусіди, чат групи, навіть Борис. Треба видихнути.',
+            'Голова гуде. Хочеться, щоб усі просто помовчали хвилин десять.'],
+      mid: ['Настрій так собі. Але бувало й гірше — і не раз.'],
+    },
+    study: {
+      bad: ['Конспекти дивляться на мене з докором. Я на них — теж.',
+            'Здається, я відстав. Ні, точно відстав. Питання лише наскільки.'],
+      mid: ['З навчанням не блискуче, але деканат поки мовчить.'],
+    },
+    social: {
+      bad: ['Здається, я вже кілька днів ні з ким нормально не говорив.',
+            'Пів поверху знає одне одного, а я досі «той із 9-го».'],
+      mid: ['З людьми нормально. Не душа компанії, але свій.'],
+    },
+  };
+
+  // гроші окремо: у них своя шкала, не 0–100
+  const moneyLine = s.money <= 100
+    ? 'У кишені вітер. Навіть на каву треба думати двічі.'
+    : s.money <= 400 ? 'Грошей обмаль. До стипендії ще дожити треба.' : null;
+
+  // шукаємо найгіршу шкалу — про неї й скаржимось
+  const scales = [
+    { key: 'energy', v: s.energy },
+    { key: 'mental', v: s.mental },
+    { key: 'study', v: s.study },
+    { key: 'social', v: s.social },
+  ].sort((a, b) => a.v - b.v);
+
+  const worst = scales[0];
+  let text;
+
+  if (worst.v < 30) {
+    const arr = LINES[worst.key].bad;
+    text = arr[Math.floor(Math.random() * arr.length)];
+  } else if (moneyLine) {
+    text = moneyLine;
+  } else if (worst.v < 55) {
+    text = LINES[worst.key].mid[0];
+  } else {
+    text = 'А непогано тримаюсь, як для кінця місяця. Може, і до стипендії дотягну.';
+  }
+
+  showOverlay(`
+    <div class="window dialog">
+      <div class="dialog-head">
+        <span class="dialog-emoji">🧑‍🎓</span>
+        <span class="dialog-who">
+          <b>${name}</b>
+          <span class="dim">сам собі під ніс</span>
+        </span>
+      </div>
+      <p class="dialog-say">«${text}»</p>
+      <button class="btn" id="self-close">Зрозуміло</button>
+    </div>`);
+  document.getElementById('self-close').onclick = hideOverlay;
+}

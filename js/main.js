@@ -58,7 +58,7 @@ function init() {
   window.addEventListener('resize', centerSceneScroll);
 
   // тест-режими обходять стартове меню
-  const isTestMode = /^#(card-|fm-|calendar-|boris|finale|gameover-|chars-geo|props-geo|phase-|shop|ai|xbox)/.test(location.hash);
+  const isTestMode = /^#(card-|fm-|calendar-|boris|finale|gameover-|chars-geo|props-geo|phase-|shop|ai|xbox|intro)/.test(location.hash);
 
   if (isTestMode) {
     enterPhase();
@@ -89,6 +89,12 @@ function init() {
       gameState.day = 14;
       renderHUD();
       showGameOver(checkGameOver());
+    }
+    // #intro або #intro-N — подивитись вступ (N — номер слайда з 0),
+    // не починаючи нової гри. Зручно, коли правиш тексти знайомства.
+    const introTest = location.hash.match(/^#intro(?:-(\d+))?$/);
+    if (introTest && typeof showIntro === 'function') {
+      showIntro(introTest[1] ? parseInt(introTest[1], 10) : 0);
     }
     // #shop — відкрити магазин одразу (грошей досить, щоб усе купити)
     if (location.hash === '#shop') {

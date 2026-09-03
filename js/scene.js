@@ -146,8 +146,8 @@ function renderOccluders(ctx) {
   }
   // Накладки з прозорістю: повнорозмірні PNG 1672×941, де все прозоре,
   // крім потрібних предметів (ріжуться в Photopea з room_base_source).
-  // chairs.png — малюється ТІЛЬКИ ВНОЧІ (бортики ліжок/ковдри поверх сплячих);
-  // always.png — малюється завжди (напр. спинки крісел). Файли необов'язкові.
+  // chairs.png — малюється ТІЛЬКИ ВНОЧІ (бортики ліжок/ковдри поверх сплячих).
+  // Файл необов'язковий: нема — просто не малюється.
   // Нічна накладка з'являється, коли ХОЧ ХТОСЬ із мешканців уже ліг спати
   // (не чекаємо, поки ляжуть усі — досить одного).
   const coveredAsleep = gameState.phase === 'night'
@@ -162,9 +162,6 @@ function renderOccluders(ctx) {
   } else {
     overlayNight.since = null; // скинути фейд до наступної ночі
   }
-  if (overlayAlways.ready) {
-    ctx.drawImage(overlayAlways, 0, 0);
-  }
 }
 
 // необов'язкові накладки (якщо файлу нема — просто не малюються)
@@ -177,7 +174,6 @@ function loadOverlay(src) {
   return img;
 }
 const overlayNight = loadOverlay('assets/sprites/overlays/chairs.png');
-const overlayAlways = loadOverlay('assets/sprites/overlays/always.png');
 
 // --- шар мусору (стан «занедбана кімната») ---
 // Повнорозмірний PNG 1672×941: пляшки, обгортки, одяг, плями на підлозі.

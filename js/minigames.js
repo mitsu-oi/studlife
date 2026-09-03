@@ -379,14 +379,11 @@ for (const o of RUN_OBSTACLES) {
   img.src = `assets/sprites/minigame/${o.kind}.png`;
   RUN_SPRITES[o.kind] = img;
 }
-// сам Борис теж може стати спрайтом: assets/sprites/minigame/boris.png
-// (профіль, дивиться ПРАВОРУЧ, прозорий фон)
-const RUN_BORIS_IMG = new Image();
-RUN_BORIS_IMG.ready = false;
-RUN_BORIS_IMG.onload = () => { RUN_BORIS_IMG.ready = true; };
-RUN_BORIS_IMG.onerror = () => { RUN_BORIS_IMG.ready = false; };
-RUN_BORIS_IMG.src = 'assets/sprites/minigame/boris.png';
-const RUN_BORIS_W = 46; // розмір Бориса-спрайта на полі
+// Бориса малюємо КОДОМ (див. runDrawBoris) — так само, як у кімнаті.
+// Спрайт не потрібен: намальований тарган виходить живий, ще й рухає
+// лапками й вусами, чого нерухома картинка не вміє.
+const RUN_BORIS_IMG = { ready: false };
+const RUN_BORIS_W = 46;
 const RUN_BORIS_H = 30;
 
 function runLoop() {

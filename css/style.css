@@ -808,12 +808,44 @@ body {
   #cheat .cheat-row input[type=range] { width: 100%; }
 }
 
-/* ---------- дуже вузькі екрани (старі/маленькі телефони) ---------- */
-@media (max-width: 380px) {
-  /* смужки прибираємо зовсім — лишаємо іконку й число,
-     інакше HUD знову не влазить */
+/* ---------- вузькі екрани (більшість телефонів) ---------- */
+@media (max-width: 430px) {
+  /* Смужки прибираємо: на вузькому екрані вони стають такими дрібними,
+     що рівень по них не прочитати. Замість них — число зі знаменником
+     («6/100»), бо саме «6» не каже нічого: багато це чи мало?
+     Селектор .bar + .value влучає лише в шкали 0–100 — гроші смужки
+     не мають, тому «/100» до них не додається. */
   #hud .stat .bar { display: none; }
-  #hud { font-size: 11px; gap: 3px 8px; }
+
+  #hud .stat .bar + .value::after {
+    content: '/100';
+    color: var(--text-dim);
+    font-size: 0.85em;
+  }
+
+  /* П'ять шкал у рядок на 360px не влазять — останню обрізало.
+     Тому розкладаємо їх СІТКОЮ 3×2: гарантовано вміщається на будь-якому
+     телефоні й читається краще, ніж стиснуте в рядок. */
+  #hud {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px 4px;
+    font-size: 12px;
+    padding: 7px 8px;
+  }
+
+  /* рядок «День 3/30 · Середа · Вечір» — на всю ширину зверху */
+  #hud .day-info {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  #hud .stat {
+    justify-content: center;
+    gap: 4px;
+  }
+  #hud .stat .value { min-width: 0; }
+
   .card-text { font-size: 14px; }
 }
 
@@ -876,12 +908,26 @@ body {
      розсовує зону — інакше сцена над нею стрибала б щоразу. */
   #decision-zone {
     flex: 0 0 auto;
-    height: 152px;
+    height: 168px;
     padding: 10px 12px;
     min-height: 0;
     overflow-y: auto;
-    align-items: center;
+
+    /* ⚠️ flex-start, а НЕ center.
+       При center браузер центрує вміст, який не влазить, — і тоді він
+       обрізається з ОБОХ боків, причому до верху неможливо прокрутити.
+       Класична пастка flex + overflow. Краще хай текст починається згори
+       й гортається донизу, ніж «красиво по центру», але недоступний. */
+    align-items: flex-start;
+    justify-content: flex-start;
+
+    /* смуга прокрутки тут ПОТРІБНА — інакше не видно, що є що гортати */
+    scrollbar-width: thin;
   }
+
+  /* натяк «є нова ситуація» лишається по центру — він короткий */
+  #decision-zone .mobile-prompt,
+  #decision-zone .phase-panel { margin: auto 0; width: 100%; }
 }
 
 /* натяк біля кнопки на телефоні: «є нова ситуація» */
@@ -961,3 +1007,167 @@ body {
 }
 
 #decision-zone::-webkit-scrollbar { display: none; }
+
+/* ---------- 👋 ВСТУП: персонаж збоку + підказки (Етап 12.6) ---------- */
+
+/* слайд про персонажа — два стовпчики: фігура ліворуч, текст праворуч */
+.window.intro.intro-with-char {
+  flex-direction: row;
+  align-items: flex-end;   /* персонаж «стоїть» на нижньому краї вікна */
+  gap: 8px;
+  /* Ширина вікна безпосередньо визначає місце для тексту:
+     540 − 260(персонаж) − відступи ≈ 244px, і текст ламався по 3 слова.
+     680 дає тексту ≈ 384px — читається спокійно, персонаж лишається великим. */
+  max-width: 680px;
+  text-align: left;
+  /* ліворуч майже без відступу: персонаж притиснутий до самого краю,
+     і весь звільнений простір дістається тексту */
+  padding: 20px 24px 18px 4px;
+}
+
+.intro-with-char .intro-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;              /* дозволяє тексту переноситись */
+}
+
+.intro-with-char .intro-title,
+.intro-with-char .intro-body { text-align: left; }
+
+/* сам персонаж: спрайт малюється кодом у canvas */
+.intro-char {
+  width: 260px;
+  height: auto;
+  flex: 0 0 auto;
+  image-rendering: auto;
+  align-self: flex-end;      /* стоїть «на підлозі» вікна */
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .5));
+}
+
+/* звичайні слайди лишаються стовпчиком */
+.window.intro .intro-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ---------- список «що можна тикати» ---------- */
+.intro-tips {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  margin: 4px 0;
+}
+
+.intro-tips li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.intro-tip-icon {
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.intro-tips b { color: #ffd166; }
+
+@media (max-width: 760px) {
+  /* 📱 На телефоні персонаж збоку — програшна схема: або він дрібний,
+     або тексту нема де вміститись (екран лише 360px завширшки).
+     Тому ставимо його ЗВЕРХУ й на всю ширину — тоді він великий,
+     а текст під ним має повний рядок. */
+  .window.intro.intro-with-char {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 16px 18px;
+  }
+
+  .intro-char {
+    width: 170px;
+    align-self: center;
+  }
+
+  .intro-with-char .intro-content { width: 100%; }
+  .intro-with-char .intro-title { text-align: center; }
+  .intro-tips li { font-size: 13px; grid-template-columns: 26px 1fr; }
+  .intro-tip-icon { font-size: 19px; }
+}
+
+/* ---------- 📱 ПОВЕДІНКА ДОТИКУ ----------
+   На телефоні браузер за замовчуванням поводиться так, ніби ти читаєш
+   сторінку, а не граєш: підсвічує синім те, у що тикнув, виділяє текст
+   при затиску й чекає, чи не буде подвійного тапу для збільшення.
+   У грі це все зайве й виглядає як поломка. */
+
+html, body {
+  /* синя підсвітка при тапі — прибрати */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Текст гри не виділяємо: гравець тикає по кімнаті й кнопках,
+   а не копіює звідти цитати. Затиснув палець — нічого не «синіє». */
+#game, #overlay, #shop-btn, #cheat {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ⚠️ Поле вводу імені — виняток: там виділяти ТРЕБА,
+   інакше не виправиш опечатку. */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Скасовує паузу ~300 мс, яку браузер тримає «на випадок подвійного тапу»,
+   і заборону масштабувати гру двома пальцями. Кліки стають миттєвими. */
+#scene, .btn, .choice-btn, #shop-btn, .card-open-btn {
+  touch-action: manipulation;
+}
+
+/* На дотику немає курсора, тому «наведення» спрацьовує залипанням:
+   кнопка лишається підсвіченою після натискання. Вимикаємо ефект наведення
+   там, де вказівника фізично не існує. */
+@media (hover: none) {
+  .btn:hover {
+    background: linear-gradient(180deg, #4a4270, #35304e);
+    border-color: #6a5da0;
+    transform: none;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  }
+  #shop-btn:hover { transform: none; border-color: #6a5da0; }
+}
+
+/* ---------- 📱 стартовий екран на телефоні ----------
+   Причина, чому вікно вилазило за край: у кнопок стояло min-width: 260px
+   («не вужче за 260»), і разом з відступами вікна це давало більше,
+   ніж ширина екрана 360px. На телефоні знімаємо це обмеження. */
+@media (max-width: 430px) {
+  .window.start {
+    max-width: 100%;
+    width: calc(100% - 12px);
+    gap: 12px;
+    padding: 18px 14px;
+  }
+
+  .window.start .btn {
+    min-width: 0;          /* ← головне виправлення */
+    width: 100%;
+    font-size: 14px;
+    padding: 12px 10px;
+  }
+
+  .start-title { font-size: 18px; }
+  .start-hint { font-size: 10px; }
+}
