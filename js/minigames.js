@@ -327,7 +327,25 @@ function startBorisRun() {
   });
 
   const canvas = document.getElementById('run-canvas');
+
+  // ⚠️ КЕРУВАННЯ: три способи, і кожен потрібен.
+  //
+  // mousedown — миша на комп'ютері.
+  // keydown   — пробіл / стрілка вгору.
+  // touchstart — ПАЛЕЦЬ. Без нього гра не працювала на iPhone.
+  //
+  // Чому mousedown не рятує на телефоні: браузер підробляє «мишачі» події
+  // з дотиків, але Safari на iOS робить це лише для тих елементів, які
+  // вважає клікабельними (кнопки, посилання). Голий <canvas> для нього —
+  // картинка, тож дотик не перетворюється ні на що. Android так не робить —
+  // тому на телефоні друга все працювало, а на айфоні ні. Та сама причина,
+  // що й із тапами по кімнаті (див. js/main.js, init).
+  //
+  // preventDefault у touchstart прибирає одразу дві біди: підроблений
+  // mousedown услід за дотиком (інакше стрибок рахувався б двічі) і
+  // «гумове» протягування сторінки під час гри.
   canvas.addEventListener('mousedown', runJump);
+  canvas.addEventListener('touchstart', runTouch, { passive: false });
   window.addEventListener('keydown', runKey);
 
   runLoop();
@@ -338,6 +356,12 @@ function runKey(e) {
     e.preventDefault();
     runJump();
   }
+}
+
+// дотик пальцем = стрибок (див. пояснення у startBorisRun)
+function runTouch(e) {
+  e.preventDefault();
+  runJump();
 }
 
 function runJump() {

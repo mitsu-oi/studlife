@@ -577,7 +577,41 @@ body {
   margin-bottom: 10px;
 }
 .arcade-title { font-size: 20px; color: #ffd166; margin-bottom: 8px; }
-.arcade-blocked { color: #ff9d6b; }
+/* ПОЧЕМУ КНОПКИ СІРІ — попередження в меню аркад.
+   Було просто помаранчевим текстом і губилось: Даша не помітила, що сил
+   не вистачає, і вирішила, що гра зламалась. Тепер це червона плашка з
+   рамкою — її видно одразу, ще до того, як тикати сірі кнопки. */
+.arcade-blocked {
+  display: inline-block;
+  color: #ff6b5a;
+  font-weight: bold;
+  background: rgba(224, 90, 74, 0.14);
+  border: 1px solid rgba(224, 90, 74, 0.55);
+  border-radius: 6px;
+  padding: 8px 14px;
+  line-height: 1.4;
+}
+.arcade-blocked::before { content: '⚠️ '; }
+
+/* ⚠️ ВИМКНЕНІ КНОПКИ — загальне правило для всієї гри.
+   У CSS не було ЖОДНОГО стилю для <button disabled>, тому браузер малював
+   такі кнопки як звичайні: вони виглядали робочими, просто не реагували.
+   Саме через це здавалось, що аркада з Борисом зламалась, хоча насправді
+   бракувало енергії.
+   Такий самий вигляд, як у .choice-btn.locked — щоб «недоступне»
+   в усій грі впізнавалось однаково. */
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.7);
+}
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: #5a5080;
+  background: linear-gradient(180deg, #3f3757, #2c2640);
+}
 
 .arcade-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
 .arcade-item {
@@ -600,6 +634,10 @@ body {
   image-rendering: auto;
   cursor: pointer;
   max-width: 100%;
+  /* 📱 Поле гри не має поводитись як сторінка: під час забігу палець
+     тільки стрибає, а не тягне екран і не збільшує масштаб подвійним
+     тапом. touch-action: none відрубує всі такі жести саме тут. */
+  touch-action: none;
 }
 .arcade-hud {
   display: flex;
