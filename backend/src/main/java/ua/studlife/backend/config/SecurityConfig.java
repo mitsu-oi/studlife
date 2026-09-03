@@ -1,5 +1,6 @@
 package ua.studlife.backend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,22 @@ import java.util.List;
  */
 @Configuration
 public class SecurityConfig {
+
+    /**
+     * Список сайтів, яким дозволено звертатись до сервера.
+     *
+     * Раніше він був вписаний прямо тут, у коді. Тепер читається з
+     * application.properties (а на хостингу — зі змінної ALLOWED_ORIGINS),
+     * бо адреси різні на твоєму ноуті й на справжньому сервері, а
+     * перезбирати програму заради одного рядка — маячня.
+     *
+     * @Value — «Spring, підстав сюди значення цієї налаштувальної строки».
+     */
+    private final List<String> allowedOrigins;
+
+    public SecurityConfig(@Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
+        this.allowedOrigins = allowedOrigins;
+    }
 
     /**
      * ШИФРУВАЛЬНИК ПАРОЛІВ.
@@ -104,20 +121,18 @@ public class SecurityConfig {
      * на інший — це захист. Тут ми називаємо ті адреси, яким довіряємо.
      *
      * ⚠️ Саме цього бракувало ШІ-скриньці: там стояло «*» — тобто
-     * будь-хто звідки завгодно. Тут одразу перелік.
+     * будь-хто звідки завгодно. Тут перелік, який задається налаштуванням
+     * app.cors.allowed-origins (див. application.properties).
      *
      * allowCredentials(true) — дозволяємо браузеру надсилати cookie
      * з номерком сесії. Без цього гравець «забувався» б на кожному запиті.
+     * Саме через це «*» тут заборонене навіть технічно: браузер не приймає
+     * «пускаю всіх» разом із «і cookie теж передавай».
      */
     @Bean
     public CorsConfigurationSource corsSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "https://mitsu-oi.github.io",   // гра в інтернеті
-                "http://localhost:8081",        // сам сервер
-                "http://127.0.0.1:5500",        // локальний сервер для розробки
-                "null"                          // гра, відкрита файлом з диска
-        ));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
