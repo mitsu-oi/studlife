@@ -203,13 +203,38 @@ function onNextClick() {
 // ---------- тост-сповіщення (короткі спливаючі підказки над сценою) ----------
 // showToast('текст') — з'являється зверху сцени і сам зникає за кілька секунд.
 let toastTimer = null;
+// Підказка, яка прийшла, поки на екрані було вікно. Покажемо, коли закриють.
+let pendingToast = null;
+
 function showToast(text, ms = 4200) {
+  // ⚠️ ПОКИ ВІДКРИТЕ ВІКНО — НЕ ПОКАЗУЄМО (зауваження Даші).
+  //
+  // Підказки на кшталт «кімнату можна гортати» вилітали ще на екрані входу
+  // й на вступі: гравець їх або не бачив за вікном, або читав про кімнату,
+  // якої ще не бачив. Тепер вони чекають, доки всі стартові вікна закриються.
+  const overlay = document.getElementById('overlay');
+  if (overlay && !overlay.classList.contains('hidden')) {
+    pendingToast = { text, ms };
+    return;
+  }
+
   let t = document.getElementById('toast');
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
     document.getElementById('scene-wrap').appendChild(t);
   }
+
+  // ⚠️ ВИСОТА HUD НА ТЕЛЕФОНІ ПЛАВАЄ: на вузьких екранах шкали лягають
+  // у два-три рядки. Через фіксовану відстань згори підказка заїжджала
+  // ПІД HUD і обрізалась. Тому міряємо HUD і ставимо тост одразу під ним.
+  if (typeof isMobileLayout === 'function' && isMobileLayout()) {
+    const hud = document.getElementById('hud');
+    t.style.top = hud ? `${Math.round(hud.getBoundingClientRect().bottom) + 8}px` : '';
+  } else {
+    t.style.top = ''; // на комп'ютері діє значення зі стилів
+  }
+
   t.textContent = text;
   // рестарт анімації появи (якщо тост уже висів)
   t.classList.remove('show');
@@ -464,6 +489,13 @@ function showOverlay(html) {
 function hideOverlay() {
   document.getElementById('overlay').classList.add('hidden');
   updateShopButton();   // вікно закрилось — кнопка знову доступна
+
+  // підказка, що чекала за вікном, тепер має де показатись
+  if (pendingToast) {
+    const { text, ms } = pendingToast;
+    pendingToast = null;
+    setTimeout(() => showToast(text, ms), 400); // хай вікно доїде
+  }
 }
 
 // плашки змін шкал «⚡ −12 · 📚 +8» з набору ефектів (''+ якщо порожньо)
