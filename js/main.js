@@ -124,8 +124,12 @@ function init() {
     // #auth — подивитись екран входу, не чекаючи сервера (#auth-register —
     // одразу вкладку реєстрації). Зручно, коли правиш тексти чи стилі:
     // з диска сервер усе одно недосяжний через CORS.
-    if (location.hash.startsWith('#auth') && typeof showAuthScreen === 'function') {
-      showAuthScreen(location.hash === '#auth-register' ? 'register' : 'login');
+    // #auth — екран вибору (три кнопки), #auth-login / #auth-register —
+    // одразу потрібна форма
+    if (location.hash.startsWith('#auth')) {
+      if (location.hash === '#auth-login') showAuthScreen('login');
+      else if (location.hash === '#auth-register') showAuthScreen('register');
+      else if (typeof showAuthChoiceScreen === 'function') showAuthChoiceScreen();
     }
     // #shop — відкрити магазин одразу (грошей досить, щоб усе купити)
     if (location.hash === '#shop') {

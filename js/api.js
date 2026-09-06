@@ -502,7 +502,7 @@ async function apiBoot() {
     return;
   }
 
-  if (!apiLoggedIn()) { showAuthScreen(); return; }
+  if (!apiLoggedIn()) { showAuthChoiceScreen(); return; }
 
   // залогінені: забираємо свій прогрес із сервера
   try {

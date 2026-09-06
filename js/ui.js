@@ -414,7 +414,7 @@ function showAccountScreen() {
   if (out) out.onclick = logoutAndReset;
 
   const inBtn = document.getElementById('acc-login');
-  if (inBtn) inBtn.onclick = () => showAuthScreen();
+  if (inBtn) inBtn.onclick = () => showAuthChoiceScreen();
 }
 
 // вішаємо обробник один раз, коли сторінка готова
@@ -734,7 +734,7 @@ function showStartScreen() {
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) logoutBtn.onclick = logoutAndReset;
   const loginBtn = document.getElementById('login-btn');
-  if (loginBtn) loginBtn.onclick = showAuthScreen;
+  if (loginBtn) loginBtn.onclick = showAuthChoiceScreen;
 
   if (save) {
     document.getElementById('continue-btn').onclick = () => {
@@ -789,9 +789,9 @@ function showConnectingScreen() {
   showOverlay(`
     <div class="window start">
       <h1 class="start-title">Складнощі студентського життя</h1>
-      <p class="dim">⏳ З'єднуємось із сервером…</p>
+      <p class="dim">🪳 Завантажуємо всіх тарганів у гуртожитку<span class="dots"><span>.</span><span>.</span><span>.</span></span></p>
       <p class="dim start-hint">
-        Він міг заснути — перше пробудження триває до хвилини
+        Сервер міг заснути — перше пробудження триває до хвилини
       </p>
       <button class="btn btn-secondary" id="boot-skip">Грати без акаунта</button>
     </div>`);
@@ -804,15 +804,55 @@ function showConnectingScreen() {
   };
 }
 
+/**
+ * ПЕРШИЙ ЕКРАН — ТРИ КНОПКИ (макет Даші).
+ *
+ * Раніше тут одразу висіли поля логіна й пароля, а «зареєструватись» і
+ * «без акаунта» тулились під ними. Виходило, що гра ніби вимагає ввести
+ * пароль, а решта варіантів — то дрібний текст унизу.
+ *
+ * Тепер спершу ПИТАННЯ, а не форма: три рівноцінні кнопки, у кожної —
+ * один рядок пояснення, навіщо вона. Поля з'являються аж після вибору.
+ */
+function showAuthChoiceScreen() {
+  showOverlay(`
+    <div class="window start auth-window">
+      <h1 class="start-title">Складнощі студентського життя</h1>
+      <p class="dim">Політех · общага «Одинадцятка» · 30 днів до стипендії</p>
+
+      <button class="btn auth-choice" id="choice-login">
+        <span class="auth-choice-name">▶ Увійти</span>
+        <span class="auth-choice-hint">(уже маю акаунт — продовжу свою гру)</span>
+      </button>
+
+      <button class="btn auth-choice" id="choice-register">
+        <span class="auth-choice-name">✚ Зареєструватися</span>
+        <span class="auth-choice-hint">(прогрес буде на всіх пристроях)</span>
+      </button>
+
+      <button class="btn btn-secondary auth-choice" id="choice-guest">
+        <span class="auth-choice-name">📴 Грати без акаунта</span>
+        <span class="auth-choice-hint">(прогрес лишиться лише в цьому браузері)</span>
+      </button>
+    </div>`);
+
+  document.getElementById('choice-login').onclick = () => showAuthScreen('login');
+  document.getElementById('choice-register').onclick = () => showAuthScreen('register');
+  document.getElementById('choice-guest').onclick = () => {
+    if (typeof apiState !== 'undefined') apiState.bootSkipped = true;
+    showStartScreen();
+  };
+}
+
 function showAuthScreen(mode = 'login', message = '') {
   const isLogin = mode === 'login';
 
   showOverlay(`
     <div class="window start auth-window">
-      <h1 class="start-title">Складнощі студентського життя</h1>
+      <h1 class="start-title">${isLogin ? 'Вхід' : 'Реєстрація'}</h1>
       <p class="dim">${isLogin
         ? 'Увійди — і прогрес буде на будь-якому пристрої'
-        : 'Створи акаунт — прогрес більше не загубиться'}</p>
+        : 'Логін латиницею, пароль від 6 символів'}</p>
 
       ${message ? `<p class="auth-error">${message}</p>` : ''}
 
@@ -822,14 +862,8 @@ function showAuthScreen(mode = 'login', message = '') {
              placeholder="Пароль (від 6 символів)"
              autocomplete="${isLogin ? 'current-password' : 'new-password'}">
 
-      <button class="btn" id="auth-go">${isLogin ? '▶ Увійти' : '✚ Зареєструватись'}</button>
-      <button class="btn btn-secondary" id="auth-switch">
-        ${isLogin ? 'Немає акаунта — зареєструватись' : 'Уже маю акаунт — увійти'}
-      </button>
-      <p class="dim start-hint">
-        <button class="linkish" id="auth-skip">Грати без акаунта</button>
-        — прогрес лишиться тільки в цьому браузері
-      </p>
+      <button class="btn" id="auth-go">${isLogin ? '▶ Увійти' : '✚ Зареєструватися'}</button>
+      <button class="btn btn-secondary" id="auth-back">← Назад</button>
     </div>`);
 
   const userEl = document.getElementById('auth-user');
@@ -872,9 +906,7 @@ function showAuthScreen(mode = 'login', message = '') {
     el.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
   });
 
-  document.getElementById('auth-switch').onclick =
-    () => showAuthScreen(isLogin ? 'register' : 'login');
-  document.getElementById('auth-skip').onclick = showStartScreen;
+  document.getElementById('auth-back').onclick = showAuthChoiceScreen;
 
   userEl.focus();
 }
