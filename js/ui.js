@@ -325,6 +325,57 @@ function updateShopButton() {
     ? Math.min(...SHOP_ITEMS.filter(i => !(gameState.flags.bought || {})[i.id]).map(i => i.price))
     : Infinity;
   btn.classList.toggle('can-afford', gameState.stats.money >= cheapest);
+
+  updateAccountButton(overlayOpen || inEditor);
+}
+
+/**
+ * КНОПКА АКАУНТА вгорі праворуч.
+ *
+ * Ховається разом із магазином, коли відкрите будь-яке вікно — інакше
+ * два кружечки висіли б поверх картки й лізли під палець.
+ * Зелена облямівка = залогінений, прогрес їде на сервер.
+ */
+function updateAccountButton(hidden) {
+  const btn = document.getElementById('account-btn');
+  if (!btn) return;
+
+  const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
+  btn.style.display = hidden ? 'none' : 'block';
+  btn.classList.toggle('online', online);
+  btn.title = online ? `Акаунт: ${apiState.user.username}` : 'Увійти в акаунт';
+  btn.onclick = showAccountScreen;
+}
+
+/** Вікно акаунта: хто зайшов, куди йде прогрес, вихід або вхід. */
+function showAccountScreen() {
+  const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
+
+  showOverlay(`
+    <div class="window start">
+      <h2>${online ? '👤 ' + apiState.user.username : '📴 Без акаунта'}</h2>
+      <p class="dim">${online
+        ? 'Прогрес зберігається на сервері — зайдеш з іншого пристрою під цим логіном і продовжиш звідси.'
+        : 'Прогрес зберігається лише в цьому браузері. Почистиш історію — і його не стане.'}</p>
+      <div class="card-choices" style="justify-content: center">
+        ${online
+          ? '<button class="btn btn-secondary" id="acc-logout">Вийти</button>'
+          : '<button class="btn" id="acc-login">▶ Увійти або зареєструватись</button>'}
+        <button class="btn btn-secondary" id="acc-close">Назад до гри</button>
+      </div>
+    </div>`);
+
+  const close = () => { hideOverlay(); renderDecisionZone(); };
+  document.getElementById('acc-close').onclick = close;
+
+  const out = document.getElementById('acc-logout');
+  if (out) out.onclick = async () => {
+    await apiLogout();
+    close();
+  };
+
+  const inBtn = document.getElementById('acc-login');
+  if (inBtn) inBtn.onclick = () => showAuthScreen();
 }
 
 // вішаємо обробник один раз, коли сторінка готова
@@ -649,6 +700,34 @@ function showStartScreen() {
 // в браузері, як було до Етапу 18. Ніхто не мав би вигадувати пароль,
 // щоб просто спробувати гру.
 // ============================================
+
+/**
+ * «ЧЕКАЄМО СЕРВЕР» — показується найпершим, поки гра питає «хто я».
+ *
+ * Навіщо окремий екран: на безкоштовному Render сервер засинає після
+ * 15 хвилин тиші й прокидається майже хвилину. Без цього вікна гравець
+ * бачив би порожню кімнату й вирішив, що гра зламалась.
+ *
+ * Кнопка «Грати без акаунта» тут не для краси: чекати ніхто не зобов'язаний.
+ */
+function showConnectingScreen() {
+  showOverlay(`
+    <div class="window start">
+      <h1 class="start-title">Складнощі студентського життя</h1>
+      <p class="dim">⏳ З'єднуємось із сервером…</p>
+      <p class="dim start-hint">
+        Він міг заснути — перше пробудження триває до хвилини
+      </p>
+      <button class="btn btn-secondary" id="boot-skip">Грати без акаунта</button>
+    </div>`);
+
+  document.getElementById('boot-skip').onclick = () => {
+    // позначаємо, щоб apiBoot() не перебив гравця своїм екраном,
+    // коли сервер нарешті відповість
+    if (typeof apiState !== 'undefined') apiState.bootSkipped = true;
+    showStartScreen();
+  };
+}
 
 function showAuthScreen(mode = 'login', message = '') {
   const isLogin = mode === 'login';

@@ -1064,6 +1064,35 @@ body {
 }
 #shop-btn:active { transform: scale(0.96); }
 
+/* ---------- кнопка акаунта (Етап 18) ----------
+   Той самий кружечок, що й магазин, але вгорі: одразу під HUD і праворуч.
+   Магазин лишається внизу — так дві круглі кнопки не зливаються в пару
+   і кожна тримається свого краю. */
+#account-btn {
+  position: fixed;
+  right: 14px;
+  top: 58px;
+  z-index: 8;
+
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+
+  background: linear-gradient(180deg, #4a4270, #35304e);
+  border: 2px solid #6a5da0;
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: transform .15s ease, border-color .15s ease;
+}
+#account-btn:hover { border-color: #ffd166; transform: scale(1.08); }
+#account-btn:active { transform: scale(0.96); }
+
+/* зелена облямівка = гравець залогінений і прогрес їде на сервер */
+#account-btn.online { border-color: #5ec27a; }
+
 /* коли грошей вистачає бодай на щось — кнопка легенько світиться,
    щоб нагадати: можна себе побалувати */
 #shop-btn.can-afford {
