@@ -347,6 +347,22 @@ function updateAccountButton(hidden) {
   btn.onclick = showAccountScreen;
 }
 
+/**
+ * ЧИ ЇДЕ ПРОГРЕС НА СЕРВЕР — людською мовою, прямо у вікні акаунта.
+ *
+ * ⚠️ Навіщо. Досі невдала відправка була ВИДНА ЛИШЕ В КОНСОЛІ (F12) —
+ * гравець просто бачив, що на іншому пристрої прогресу нема, і не мав
+ * жодного способу зрозуміти чому. Тепер причина написана там, де питання
+ * і виникає.
+ */
+function accountSyncText() {
+  if (apiState.lastPushOk === true) return '✅ Останнє збереження доїхало на сервер';
+  if (apiState.lastPushOk === false) {
+    return `⚠️ Останнє збереження НЕ доїхало: ${apiState.lastError || 'причина невідома'}`;
+  }
+  return 'ℹ️ Ще нічого не зберігалось у цій сесії — зроби хід, і перевір знову';
+}
+
 /** Вікно акаунта: хто зайшов, куди йде прогрес, вихід або вхід. */
 function showAccountScreen() {
   const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
@@ -357,6 +373,7 @@ function showAccountScreen() {
       <p class="dim">${online
         ? 'Прогрес зберігається на сервері — зайдеш з іншого пристрою під цим логіном і продовжиш звідси.'
         : 'Прогрес зберігається лише в цьому браузері. Почистиш історію — і його не стане.'}</p>
+      ${online ? `<p class="auth-error acc-sync">${accountSyncText()}</p>` : ''}
       <div class="card-choices" style="justify-content: center">
         ${online
           ? '<button class="btn btn-secondary" id="acc-logout">Вийти</button>'
