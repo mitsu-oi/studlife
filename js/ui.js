@@ -222,18 +222,21 @@ function showToast(text, ms = 4200) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
-    document.getElementById('scene-wrap').appendChild(t);
+    // ⚠️ ЧІПЛЯЄМО ДО BODY, А НЕ ДО #scene-wrap.
+    //
+    // Спершу підказка жила всередині сцени — і там її ОБРІЗАЛО зверху,
+    // хоч ми й рахували висоту HUD. Причина: у #scene-wrap на телефоні
+    // стоїть overflow (сцена гортається вбік), а все, що виходить за межі
+    // такого блока, браузер відрізає. Найнадійніше — узагалі не жити
+    // всередині нього: біля <body> обрізати нема кому.
+    document.body.appendChild(t);
   }
 
-  // ⚠️ ВИСОТА HUD НА ТЕЛЕФОНІ ПЛАВАЄ: на вузьких екранах шкали лягають
-  // у два-три рядки. Через фіксовану відстань згори підказка заїжджала
-  // ПІД HUD і обрізалась. Тому міряємо HUD і ставимо тост одразу під ним.
-  if (typeof isMobileLayout === 'function' && isMobileLayout()) {
-    const hud = document.getElementById('hud');
-    t.style.top = hud ? `${Math.round(hud.getBoundingClientRect().bottom) + 8}px` : '';
-  } else {
-    t.style.top = ''; // на комп'ютері діє значення зі стилів
-  }
+  // ⚠️ ВИСОТА HUD ПЛАВАЄ: на вузьких екранах шкали лягають у два-три рядки.
+  // Тому не вгадуємо відстань згори, а міряємо HUD щоразу й ставимо
+  // підказку одразу під ним.
+  const hud = document.getElementById('hud');
+  t.style.top = hud ? `${Math.round(hud.getBoundingClientRect().bottom) + 8}px` : '16px';
 
   t.textContent = text;
   // рестарт анімації появи (якщо тост уже висів)
@@ -381,24 +384,27 @@ function updateAccountButton(hidden) {
  * і виникає.
  */
 function accountSyncText() {
-  if (apiState.lastPushOk === true) return '✅ Останнє збереження доїхало на сервер';
-  if (apiState.lastPushOk === false) {
-    return `⚠️ Останнє збереження НЕ доїхало: ${apiState.lastError || 'причина невідома'}`;
+  if (apiState.lastPushOk === true) {
+    return { kind: 'ok', text: '✅ Усе збережено' };
   }
-  return 'ℹ️ Ще нічого не зберігалось у цій сесії — зроби хід, і перевір знову';
+  if (apiState.lastPushOk === false) {
+    return { kind: 'warn', text: '⚠️ Останній хід не зберігся — перевір інтернет' };
+  }
+  return { kind: 'idle', text: '🪳 Борис ще нічого не встиг записати' };
 }
 
 /** Вікно акаунта: хто зайшов, куди йде прогрес, вихід або вхід. */
 function showAccountScreen() {
   const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
+  const sync = online ? accountSyncText() : null;
 
   showOverlay(`
     <div class="window start">
       <h2>${online ? '👤 ' + apiState.user.username : '📴 Без акаунта'}</h2>
       <p class="dim">${online
-        ? 'Прогрес зберігається на сервері — зайдеш з іншого пристрою під цим логіном і продовжиш звідси.'
-        : 'Прогрес зберігається лише в цьому браузері. Почистиш історію — і його не стане.'}</p>
-      ${online ? `<p class="auth-error acc-sync">${accountSyncText()}</p>` : ''}
+        ? 'Твоя кімната їде за тобою: зайдеш із телефона чи ноута — і продовжиш із того самого дня.'
+        : 'Гра живе тільки в цьому браузері. Почистиш історію — і Борис усе забуде.'}</p>
+      ${sync ? `<p class="acc-sync ${sync.kind}">${sync.text}</p>` : ''}
       <div class="card-choices" style="justify-content: center">
         ${online
           ? '<button class="btn btn-secondary" id="acc-logout">Вийти</button>'
@@ -716,9 +722,9 @@ function showStartScreen() {
   const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
   const accountRow = online
     ? `<p class="dim start-account">👤 ${apiState.user.username}
-         · прогрес на сервері
+         · гра їде за тобою
          <button class="linkish" id="logout-btn">вийти</button></p>`
-    : `<p class="dim start-account">📴 Без акаунта — прогрес лише в цьому браузері
+    : `<p class="dim start-account">📴 Граєш без акаунта — гра живе тільки тут
          <button class="linkish" id="login-btn">увійти</button></p>`;
 
   showOverlay(`

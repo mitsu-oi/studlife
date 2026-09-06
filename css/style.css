@@ -110,7 +110,10 @@ body {
 
 /* тост-сповіщення: спливає зверху сцени і плавно зникає */
 #toast {
-  position: absolute;
+  /* fixed, а не absolute: підказка живе біля <body> і прив'язана до ЕКРАНА.
+     Так її не обрізає рамка сцени й не тягне за собою гортання кімнати.
+     Значення top ставить код (js/ui.js, showToast) — одразу під HUD. */
+  position: fixed;
   top: 16px;
   left: 50%;
   transform: translate(-50%, -12px);
@@ -568,6 +571,34 @@ body {
   padding: 8px 14px;
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* Стан збереження у вікні акаунта.
+   ⚠️ Спершу я показувала його стилем .auth-error — і бадьоре «Усе
+   збережено» з'являлось у ЧЕРВОНІЙ рамці помилки. Тому три окремі
+   настрої: добре, погано, ще нічого. */
+.acc-sync {
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: bold;
+}
+.acc-sync.ok {
+  color: #5ec27a;
+  background: rgba(94, 194, 122, 0.12);
+  border: 1px solid rgba(94, 194, 122, 0.45);
+}
+.acc-sync.warn {
+  color: #ff6b5a;
+  background: rgba(224, 90, 74, 0.14);
+  border: 1px solid rgba(224, 90, 74, 0.55);
+}
+.acc-sync.idle {
+  color: var(--text);
+  opacity: 0.7;
+  font-weight: normal;
+  border: 1px solid var(--panel-border);
 }
 
 /* хто зайшов / «без акаунта» — рядок унизу стартового екрана */
