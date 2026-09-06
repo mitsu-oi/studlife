@@ -23,6 +23,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	// Сесії живуть у БАЗІ, а не в пам'яті програми, і номерок сесії
+	// їздить у ЗАГОЛОВКУ, а не в cookie. Навіщо — див. SecurityConfig
+	// (Safari блокує сторонні cookie) і application.properties.
+	implementation 'org.springframework.session:spring-session-jdbc'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

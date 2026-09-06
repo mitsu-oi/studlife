@@ -9,6 +9,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.session.web.http.HeaderHttpSessionIdResolver;
+import org.springframework.session.web.http.HttpSessionIdResolver;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -39,6 +41,33 @@ public class SecurityConfig {
 
     public SecurityConfig(@Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
         this.allowedOrigins = allowedOrigins;
+    }
+
+    /**
+     * ⚠️ НОМЕРОК СЕСІЇ ЇЗДИТЬ У ЗАГОЛОВКУ, А НЕ В COOKIE.
+     *
+     * ЧОМУ ДОВЕЛОСЬ ЗМІНИТИ. Гра лежить на mitsu-oi.github.io, сервер —
+     * на onrender.com. Для браузера це РІЗНІ сайти, тож cookie від сервера
+     * вважається «сторонньою» (third-party). Safari на iPhone за
+     * замовчуванням такі cookie БЛОКУЄ («Запобігати перехресному
+     * відстеженню»), і решта браузерів іде туди ж.
+     *
+     * Як це виглядало у грі: вхід ніби вдавався (сервер відповідав «ти
+     * test1»), але вже наступний запит ішов без cookie — і сервер не
+     * впізнавав гравця. На екрані: «👤 test1», а прогресу нема. Після
+     * перезавантаження — знову екран входу.
+     *
+     * ЯК ПРАЦЮЄ ТЕПЕР. Після входу сервер віддає номерок сесії у заголовку
+     * X-AUTH-TOKEN. Гра зберігає його в себе і сама прикладає до кожного
+     * наступного запиту. Це вже не cookie, тож блокувати нема чого:
+     * браузер нічого не робить «сам», усе робить наш код свідомо.
+     *
+     * Разом із spring-session-jdbc (сесії лежать у БАЗІ) це заразом лікує
+     * і виліт з акаунтів після того, як Render засинає.
+     */
+    @Bean
+    public HttpSessionIdResolver httpSessionIdResolver() {
+        return HeaderHttpSessionIdResolver.xAuthToken();
     }
 
     /**
@@ -136,6 +165,13 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
+
+        // ⚠️ БЕЗ ЦЬОГО РЯДКА НІЧОГО НЕ ПРАЦЮВАТИМЕ.
+        // Браузер за замовчуванням ХОВАЄ від коду сторінки майже всі
+        // заголовки чужої відповіді — це захист. Тому номерок сесії,
+        // який сервер віддає в X-Auth-Token, гра просто не побачила б.
+        // Тут ми свідомо кажемо: «цей заголовок показувати можна».
+        config.setExposedHeaders(List.of("X-Auth-Token"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

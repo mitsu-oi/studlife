@@ -78,6 +78,40 @@ function apiLoggedIn() {
   return !!(apiState.user && apiState.user.id);
 }
 
+// ---------- НОМЕРОК СЕСІЇ (токен) ----------
+//
+// ⚠️ РАНІШЕ ЦЕ БУЛА COOKIE, І ЧЕРЕЗ ЦЕ ГРА НЕ ПРАЦЮВАЛА НА iPhone.
+//
+// Гра лежить на github.io, сервер — на onrender.com. Для браузера це різні
+// сайти, тож cookie від сервера вважається «сторонньою». Safari такі cookie
+// блокує за замовчуванням. Виглядало так: вхід ніби вдався («👤 test1»),
+// а прогресу нема; після перезавантаження — знову екран входу.
+//
+// ТЕПЕР номерок сесії приходить у заголовку відповіді, ми кладемо його в
+// localStorage і САМІ прикладаємо до кожного запиту. Браузер у це не
+// втручається, бо нічого не робить «за нас» — блокувати нема чого.
+//
+// 🔒 Чому це не гірше за cookie з погляду безпеки: номерок нічого не
+// означає сам по собі (це випадковий рядок), а сесія все одно живе на
+// сервері й може бути анульована будь-коли. Головна відмінність — його
+// видно з JavaScript. Але наша гра й так уся на JavaScript, і чужих
+// скриптів на сторінці нема.
+const API_TOKEN_KEY = 'studlife_token';
+
+function apiToken() {
+  try { return localStorage.getItem(API_TOKEN_KEY) || ''; } catch (e) { return ''; }
+}
+
+function apiSetToken(token) {
+  try {
+    if (token) localStorage.setItem(API_TOKEN_KEY, token);
+  } catch (e) { /* приватне вікно — попрацюємо до перезавантаження */ }
+}
+
+function apiClearToken() {
+  try { localStorage.removeItem(API_TOKEN_KEY); } catch (e) { /* нічого */ }
+}
+
 // Рядок для чит-панелі (клавіша D) — людською мовою
 function apiStatusText() {
   if (!API_ENABLED) return '⚫ вимкнено (API_ENABLED = false)';
@@ -105,15 +139,26 @@ function apiStatusText() {
 async function apiFetch(path, { method = 'GET', body = null } = {}) {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), API_TIMEOUT_MS);
+
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  // ⚠️ НОМЕРОК СЕСІЇ — вручну, у заголовку (див. пояснення біля apiToken)
+  const token = apiToken();
+  if (token) headers['X-Auth-Token'] = token;
+
   try {
     const res = await fetch(API_BASE + path, {
       method,
       signal: abort.signal,
-      credentials: 'include',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
+      credentials: 'include', // лишаємо для локальної розробки, де cookie ще працює
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
     apiState.reachable = true;
+
+    // сервер видав НОВИЙ номерок (вхід або реєстрація) — запам'ятовуємо
+    const fresh = res.headers.get('X-Auth-Token');
+    if (fresh) apiSetToken(fresh);
 
     // 204 = «порожньо, але це не помилка» (напр. активної гри ще нема)
     if (res.status === 204) return { ok: true, status: 204, data: null };
@@ -189,10 +234,11 @@ async function apiLogin(username, password) {
   return { ok: false, error: msg };
 }
 
-/** Вихід. Сервер забуде номерок, ми забудемо користувача. */
+/** Вихід. Сервер забуде номерок, ми забудемо і номерок, і користувача. */
 async function apiLogout() {
   await apiFetch('/api/auth/logout', { method: 'POST' });
   apiState.user = null;
+  apiClearToken(); // інакше наступний запит пішов би зі старим, уже мертвим
 }
 
 // ---------- ПЕРЕКЛАД: gameState ↔ те, що розуміє сервер ----------
