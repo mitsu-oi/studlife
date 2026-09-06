@@ -696,45 +696,6 @@ function showStartScreen() {
 // ============================================
 
 /**
- * ⚠️ ДВА СЕЙВИ, І ТРЕБА ОБРАТИ.
- *
- * Буває, коли в браузері лежить ГОСТЬОВА (або чужа) гра, а в акаунті —
- * своя. Мовчки затерти не можна ні в який бік: обидві чиясь справжня гра.
- * Саме на цьому ми обпеклись двічі, тому тут — питання, а не рішення.
- */
-function showSaveConflictScreen(run) {
-  const localDay = apiLocalDay();
-
-  showOverlay(`
-    <div class="window start">
-      <h2>🤔 Знайшлися дві гри</h2>
-      <p class="dim">У цьому браузері лежить гра, почата <b>без акаунта</b>,
-        а в акаунті <b>${apiState.user.username}</b> — своя. Обери, яку лишити.
-        Друга зникне.</p>
-      <div class="card-choices" style="justify-content: center">
-        <button class="btn" id="keep-server">
-          👤 Гру акаунта · день ${run.day}/${CONFIG.TOTAL_DAYS}
-        </button>
-        <button class="btn btn-secondary" id="keep-local">
-          📴 Гру з цього браузера · день ${localDay}/${CONFIG.TOTAL_DAYS}
-        </button>
-      </div>
-    </div>`);
-
-  document.getElementById('keep-server').onclick = () => {
-    apiApplyServerSave(run);
-    showStartScreen();
-  };
-
-  document.getElementById('keep-local').onclick = () => {
-    // лишаємо місцеву: помічаємо її своєю, і вона поїде на сервер,
-    // щойно гравець продовжить гру
-    apiMarkSaveOwner();
-    showStartScreen();
-  };
-}
-
-/**
  * ВИХІД З АКАУНТА + СКИДАННЯ (побажання Даші).
  *
  * Прогрес акаунта лишається на сервері, а з браузера прибирається. Так
@@ -834,11 +795,7 @@ function showAuthScreen(mode = 'login', message = '') {
 
     // зайшли: забираємо свій прогрес із сервера в браузер
     try {
-      const run = await apiLoadRun();
-      if (run && apiSyncRun(run) === 'conflict') {
-        showSaveConflictScreen(run); // у браузері чужа/гостьова гра — хай обере
-        return;
-      }
+      apiSyncRun(await apiLoadRun());
     } catch (e) { /* нема чого забирати — почнемо нову */ }
 
     showStartScreen();
