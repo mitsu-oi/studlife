@@ -9,6 +9,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.session.jdbc.config.annotation.web.http.EnableJdbcHttpSession;
 import org.springframework.session.web.http.HeaderHttpSessionIdResolver;
 import org.springframework.session.web.http.HttpSessionIdResolver;
 import org.springframework.web.cors.CorsConfiguration;
@@ -24,7 +25,23 @@ import java.util.List;
  * бачили 401 на порожньому сервері). Тут ми свідомо відчиняємо рівно
  * стільки, скільки треба — і ні краплі більше.
  */
+/**
+ * ⚠️ @EnableJdbcHttpSession — ВМИКАЄМО СЕСІЇ В БАЗІ ЯВНО.
+ *
+ * Мало б працювати саме: залежність spring-session-jdbc є в збірці, і
+ * Spring Boot зазвичай підхоплює її без жодних налаштувань. Але не
+ * підхопив — перевірено на живому сервері: таблиць у базі не з'явилось,
+ * заголовок X-Auth-Token не видавався, вхід тримався тільки на cookie
+ * (а отже помирав у Safari).
+ *
+ * Тому вмикаємо руками. Так поведінка не залежить від того, здогадається
+ * фреймворк чи ні — а це якраз те, що не має бути лотереєю.
+ *
+ * maxInactiveIntervalInSeconds — скільки сесія живе без активності.
+ * 30 днів: гравець не має перелогінюватись щотижня.
+ */
 @Configuration
+@EnableJdbcHttpSession(maxInactiveIntervalInSeconds = 60 * 60 * 24 * 30)
 public class SecurityConfig {
 
     /**
