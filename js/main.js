@@ -57,6 +57,14 @@ function init() {
   centerSceneScroll();
   window.addEventListener('resize', centerSceneScroll);
 
+  // ⚠️ Зона рішень виглядає по-різному у широкому й вузькому вікні
+  // (у вузькому картка відкривається окремим вікном — див. useCardModal).
+  // Без цього рядка гравець, який змінив розмір вікна, лишався б зі старим
+  // виглядом до наступної фази — а це саме той стан, де текст зникає.
+  window.addEventListener('resize', () => {
+    if (typeof renderDecisionZone === 'function') renderDecisionZone();
+  });
+
   // ============================================
   // 🍏 ВИПРАВЛЕННЯ ДЛЯ iPhone — не прибирати!
   //
