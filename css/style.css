@@ -506,6 +506,56 @@ body {
 .window.start .btn { min-width: 260px; }
 .start-hint { font-size: 11px; }
 
+/* ---------- екран входу (Етап 18) ---------- */
+
+/* поля логіна й пароля — той самий вигляд, що в поля імені у вступі,
+   щоб екран входу не виглядав чужим у грі */
+.auth-input {
+  align-self: center;
+  width: 100%;
+  max-width: 300px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  text-align: center;
+  color: var(--text);
+  background: #1b1725;
+  border: 2px solid #6a5da0;
+  border-radius: 8px;
+  outline: none;
+}
+.auth-input:focus { border-color: #ffd166; }
+
+/* причина відмови: «пароль не підходить», «логін зайнятий» */
+.auth-error {
+  color: #ff6b5a;
+  font-weight: bold;
+  background: rgba(224, 90, 74, 0.14);
+  border: 1px solid rgba(224, 90, 74, 0.55);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* хто зайшов / «без акаунта» — рядок унизу стартового екрана */
+.start-account { font-size: 11px; line-height: 1.6; }
+
+/* кнопка, яка виглядає як посилання: «вийти», «грати без акаунта».
+   Це саме <button>, а не <a>: нікуди не веде, а лише виконує дію —
+   і заразом лишається доступною з клавіатури. */
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: #ffd166;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.linkish:hover { color: #fff; }
+
 .btn-secondary {
   background: transparent;
   border-color: var(--panel-border);

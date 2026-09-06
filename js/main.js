@@ -83,7 +83,7 @@ function init() {
   canvas.addEventListener('click', () => {});
 
   // тест-режими обходять стартове меню
-  const isTestMode = /^#(card-|fm-|calendar-|boris|finale|gameover-|chars-geo|props-geo|phase-|shop|ai|xbox|intro)/.test(location.hash);
+  const isTestMode = /^#(card-|fm-|calendar-|boris|finale|gameover-|chars-geo|props-geo|phase-|shop|ai|xbox|intro|auth)/.test(location.hash);
 
   if (isTestMode) {
     enterPhase();
@@ -121,6 +121,12 @@ function init() {
     if (introTest && typeof showIntro === 'function') {
       showIntro(introTest[1] ? parseInt(introTest[1], 10) : 0);
     }
+    // #auth — подивитись екран входу, не чекаючи сервера (#auth-register —
+    // одразу вкладку реєстрації). Зручно, коли правиш тексти чи стилі:
+    // з диска сервер усе одно недосяжний через CORS.
+    if (location.hash.startsWith('#auth') && typeof showAuthScreen === 'function') {
+      showAuthScreen(location.hash === '#auth-register' ? 'register' : 'login');
+    }
     // #shop — відкрити магазин одразу (грошей досить, щоб усе купити)
     if (location.hash === '#shop') {
       gameState.stats.money = 5000;
@@ -150,10 +156,14 @@ function init() {
       });
     }
   } else {
-    // звичайний запуск: стартовий екран Продовжити / Нова гра
+    // Звичайний запуск. apiBoot() (js/api.js) сам вирішує, що показати:
+    // не залогінений і сервер живий → екран входу;
+    // залогінений → забирає сейв із сервера і показує «Продовжити»;
+    // сервера нема → одразу стартовий екран, гра працює офлайн.
     renderHUD();
     renderDecisionZone();
-    showStartScreen();
+    if (typeof apiBoot === 'function') apiBoot();
+    else showStartScreen();
   }
 
   requestAnimationFrame(gameLoop);

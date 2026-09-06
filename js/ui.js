@@ -599,14 +599,32 @@ function showStartScreen() {
     } catch (e) { /* нестрашно, покажемо без дня */ }
   }
 
+  // рядок про акаунт: хто зайшов, або чому сейв лише тут
+  const online = typeof apiLoggedIn === 'function' && apiLoggedIn();
+  const accountRow = online
+    ? `<p class="dim start-account">👤 ${apiState.user.username}
+         · прогрес на сервері
+         <button class="linkish" id="logout-btn">вийти</button></p>`
+    : `<p class="dim start-account">📴 Без акаунта — прогрес лише в цьому браузері
+         <button class="linkish" id="login-btn">увійти</button></p>`;
+
   showOverlay(`
     <div class="window start">
       <h1 class="start-title">Складнощі студентського життя</h1>
       <p class="dim">Політех · общага «Одинадцятка» · 30 днів до стипендії</p>
       ${save ? `<button class="btn" id="continue-btn">▶ Продовжити${saveInfo}</button>` : ''}
       <button class="btn ${save ? 'btn-secondary' : ''}" id="newgame-btn">✚ Нова гра</button>
+      ${accountRow}
       <p class="dim start-hint">Прогрес зберігається автоматично щоранку</p>
     </div>`);
+
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.onclick = async () => {
+    await apiLogout();
+    showStartScreen();
+  };
+  const loginBtn = document.getElementById('login-btn');
+  if (loginBtn) loginBtn.onclick = showAuthScreen;
 
   if (save) {
     document.getElementById('continue-btn').onclick = () => {
@@ -619,6 +637,93 @@ function showStartScreen() {
     if (save) showNewGameConfirm(); // є прогрес — перепитати!
     else startFreshGame();
   };
+}
+
+// ============================================
+// ЕКРАН ВХОДУ (Етап 18)
+//
+// Показується найпершим, якщо сервер доступний і гравець ще не зайшов.
+//
+// ⚠️ ГОЛОВНЕ: третя кнопка «Грати без акаунта» — не формальність, а
+// принцип. Гра МУСИТЬ гратися без реєстрації: прогрес тоді лишається
+// в браузері, як було до Етапу 18. Ніхто не мав би вигадувати пароль,
+// щоб просто спробувати гру.
+// ============================================
+
+function showAuthScreen(mode = 'login', message = '') {
+  const isLogin = mode === 'login';
+
+  showOverlay(`
+    <div class="window start auth-window">
+      <h1 class="start-title">Складнощі студентського життя</h1>
+      <p class="dim">${isLogin
+        ? 'Увійди — і прогрес буде на будь-якому пристрої'
+        : 'Створи акаунт — прогрес більше не загубиться'}</p>
+
+      ${message ? `<p class="auth-error">${message}</p>` : ''}
+
+      <input type="text" id="auth-user" class="auth-input" maxlength="32"
+             placeholder="Логін (латиниця, цифри)" autocomplete="username">
+      <input type="password" id="auth-pass" class="auth-input" maxlength="100"
+             placeholder="Пароль (від 6 символів)"
+             autocomplete="${isLogin ? 'current-password' : 'new-password'}">
+
+      <button class="btn" id="auth-go">${isLogin ? '▶ Увійти' : '✚ Зареєструватись'}</button>
+      <button class="btn btn-secondary" id="auth-switch">
+        ${isLogin ? 'Немає акаунта — зареєструватись' : 'Уже маю акаунт — увійти'}
+      </button>
+      <p class="dim start-hint">
+        <button class="linkish" id="auth-skip">Грати без акаунта</button>
+        — прогрес лишиться тільки в цьому браузері
+      </p>
+    </div>`);
+
+  const userEl = document.getElementById('auth-user');
+  const passEl = document.getElementById('auth-pass');
+  const goBtn = document.getElementById('auth-go');
+
+  async function submit() {
+    const username = userEl.value.trim();
+    const password = passEl.value;
+    if (!username || !password) {
+      showAuthScreen(mode, 'Впиши логін і пароль');
+      return;
+    }
+
+    // сервер може прокидатись зі сну майже хвилину — тому кнопка одразу
+    // каже, що вона не зависла, і не дає натиснути двічі
+    goBtn.disabled = true;
+    goBtn.textContent = '⏳ Хвилинку…';
+
+    const res = isLogin
+      ? await apiLogin(username, password)
+      : await apiRegister(username, password);
+
+    if (!res.ok) {
+      showAuthScreen(mode, res.error);
+      return;
+    }
+
+    // зайшли: забираємо свій прогрес із сервера в браузер
+    try {
+      const run = await apiLoadRun();
+      if (run) apiApplyServerSave(run);
+    } catch (e) { /* нема чого забирати — почнемо нову */ }
+
+    showStartScreen();
+  }
+
+  goBtn.onclick = submit;
+  // Enter у будь-якому полі = натиснути кнопку
+  [userEl, passEl].forEach(el => {
+    el.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+  });
+
+  document.getElementById('auth-switch').onclick =
+    () => showAuthScreen(isLogin ? 'register' : 'login');
+  document.getElementById('auth-skip').onclick = showStartScreen;
+
+  userEl.focus();
 }
 
 // підтвердження перед стиранням прогресу
@@ -636,7 +741,17 @@ function showNewGameConfirm() {
   document.getElementById('back-btn').onclick = showStartScreen;
 }
 
-function startFreshGame() {
+async function startFreshGame() {
+  // ⚠️ Нову гру треба почати Й НА СЕРВЕРІ, і саме ДО newGame().
+  //
+  // Чому: сервер захищений від шахрайства правилом «день не може йти
+  // назад». Якщо там висить незакінчена гра на 14-му дні, а ми почнемо
+  // локально з 1-го, то перший же сейв прилетить із «день 1» — і сервер
+  // його відкине як спробу переграти невдалий тиждень. Тому спершу
+  // кажемо йому «стару гру закрий, починаємо нову».
+  if (typeof apiLoggedIn === 'function' && apiLoggedIn()) {
+    await apiNewRun();
+  }
   newGame();
   renderHUD();
   showIntro(); // спершу вступ-знайомство, далі — календарик першого дня

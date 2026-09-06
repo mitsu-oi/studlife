@@ -168,7 +168,16 @@ function computeEnding() {
 const SAVE_KEY = 'studlife_save';
 
 function saveGame() {
+  // 1. У БРАУЗЕР — миттєво. Це головний сейв: він працює завжди,
+  //    навіть без інтернету й без акаунта.
   localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+
+  // 2. НА СЕРВЕР — у фоні, і тільки якщо гравець залогінений.
+  //    Функція нічого не надсилає одразу: вона зводить таймер, і за
+  //    півтори секунди тиші полетить один запит із найсвіжішим станом
+  //    (див. js/api.js). Тому цей рядок не сповільнює гру ні на мить,
+  //    а якщо api.js узагалі не підключений — просто нічого не робить.
+  if (typeof apiSchedulePush === 'function') apiSchedulePush();
 }
 
 function hasSave() {
