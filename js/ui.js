@@ -685,7 +685,23 @@ function showFinale() {
 // ============================================
 
 function showStartScreen() {
-  const save = hasSave();
+  // ⚠️ ГОСТЮ НЕ ПОКАЗУЄМО ГРУ АКАУНТА (зауваження Даші).
+  //
+  // Було так: вийшов з акаунта (або сесія злетіла), натиснув «грати без
+  // акаунта» — і продовжуєш чужу гру з того самого дня. На спільному
+  // комп'ютері це взагалі виглядає як чужий прогрес у твоїх руках.
+  //
+  // Сейв підписаний власником (див. apiSaveOwner). Якщо підпис є, а зайти
+  // під тим логіном ніхто не зайшов — ховаємо «Продовжити».
+  //
+  // Втратити цим нічого не можна: підпис ставиться ЛИШЕ тоді, коли гра
+  // успішно доїхала на сервер або звідти прийшла. Тобто підписаний сейв
+  // за визначенням є на сервері — досить увійти, і він повернеться.
+  const owner = typeof apiSaveOwner === 'function' ? apiSaveOwner() : '';
+  const loggedIn = typeof apiLoggedIn === 'function' && apiLoggedIn();
+  const accountSaveHidden = owner && !loggedIn;
+
+  const save = hasSave() && !accountSaveHidden;
 
   // показати день із сейва на кнопці «Продовжити»
   let saveInfo = '';
@@ -888,6 +904,10 @@ async function startFreshGame() {
   // кажемо йому «стару гру закрий, починаємо нову».
   if (typeof apiLoggedIn === 'function' && apiLoggedIn()) {
     await apiNewRun();
+  } else if (typeof apiForgetLocalSave === 'function') {
+    // гостьова гра починається з чистого аркуша: знімаємо підпис акаунта
+    // зі старого сейва, щоб дві історії не змішувались
+    apiForgetLocalSave();
   }
   newGame();
   renderHUD();
