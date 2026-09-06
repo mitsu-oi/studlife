@@ -369,10 +369,7 @@ function showAccountScreen() {
   document.getElementById('acc-close').onclick = close;
 
   const out = document.getElementById('acc-logout');
-  if (out) out.onclick = async () => {
-    await apiLogout();
-    close();
-  };
+  if (out) out.onclick = logoutAndReset;
 
   const inBtn = document.getElementById('acc-login');
   if (inBtn) inBtn.onclick = () => showAuthScreen();
@@ -670,10 +667,7 @@ function showStartScreen() {
     </div>`);
 
   const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn) logoutBtn.onclick = async () => {
-    await apiLogout();
-    showStartScreen();
-  };
+  if (logoutBtn) logoutBtn.onclick = logoutAndReset;
   const loginBtn = document.getElementById('login-btn');
   if (loginBtn) loginBtn.onclick = showAuthScreen;
 
@@ -700,6 +694,61 @@ function showStartScreen() {
 // в браузері, як було до Етапу 18. Ніхто не мав би вигадувати пароль,
 // щоб просто спробувати гру.
 // ============================================
+
+/**
+ * ⚠️ ДВА СЕЙВИ, І ТРЕБА ОБРАТИ.
+ *
+ * Буває, коли в браузері лежить ГОСТЬОВА (або чужа) гра, а в акаунті —
+ * своя. Мовчки затерти не можна ні в який бік: обидві чиясь справжня гра.
+ * Саме на цьому ми обпеклись двічі, тому тут — питання, а не рішення.
+ */
+function showSaveConflictScreen(run) {
+  const localDay = apiLocalDay();
+
+  showOverlay(`
+    <div class="window start">
+      <h2>🤔 Знайшлися дві гри</h2>
+      <p class="dim">У цьому браузері лежить гра, почата <b>без акаунта</b>,
+        а в акаунті <b>${apiState.user.username}</b> — своя. Обери, яку лишити.
+        Друга зникне.</p>
+      <div class="card-choices" style="justify-content: center">
+        <button class="btn" id="keep-server">
+          👤 Гру акаунта · день ${run.day}/${CONFIG.TOTAL_DAYS}
+        </button>
+        <button class="btn btn-secondary" id="keep-local">
+          📴 Гру з цього браузера · день ${localDay}/${CONFIG.TOTAL_DAYS}
+        </button>
+      </div>
+    </div>`);
+
+  document.getElementById('keep-server').onclick = () => {
+    apiApplyServerSave(run);
+    showStartScreen();
+  };
+
+  document.getElementById('keep-local').onclick = () => {
+    // лишаємо місцеву: помічаємо її своєю, і вона поїде на сервер,
+    // щойно гравець продовжить гру
+    apiMarkSaveOwner();
+    showStartScreen();
+  };
+}
+
+/**
+ * ВИХІД З АКАУНТА + СКИДАННЯ (побажання Даші).
+ *
+ * Прогрес акаунта лишається на сервері, а з браузера прибирається. Так
+ * наступний, хто сяде за цей комп'ютер, почне з чистого аркуша, а не
+ * продовжить чужу гру. Заразом це знімає й плутанину «чий тут сейв».
+ */
+async function logoutAndReset() {
+  await apiLogout();
+  apiForgetLocalSave();
+  newGame();
+  renderHUD();
+  renderDecisionZone();
+  showStartScreen();
+}
 
 /**
  * «ЧЕКАЄМО СЕРВЕР» — показується найпершим, поки гра питає «хто я».
@@ -786,7 +835,10 @@ function showAuthScreen(mode = 'login', message = '') {
     // зайшли: забираємо свій прогрес із сервера в браузер
     try {
       const run = await apiLoadRun();
-      if (run) apiSyncRun(run);
+      if (run && apiSyncRun(run) === 'conflict') {
+        showSaveConflictScreen(run); // у браузері чужа/гостьова гра — хай обере
+        return;
+      }
     } catch (e) { /* нема чого забирати — почнемо нову */ }
 
     showStartScreen();

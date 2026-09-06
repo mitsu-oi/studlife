@@ -247,6 +247,7 @@ function apiApplyServerSave(run) {
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    apiMarkSaveOwner(); // тепер цей сейв належить залогіненому гравцю
     return true;
   } catch (e) {
     return false; // приватне вікно / нема місця — не біда, зіграємо без сейва
@@ -254,6 +255,39 @@ function apiApplyServerSave(run) {
 }
 
 // ---------- ГРА НА СЕРВЕРІ ----------
+
+/**
+ * ЧИЙ САМЕ СЕЙВ ЛЕЖИТЬ У ЦЬОМУ БРАУЗЕРІ.
+ *
+ * Окремий запис поруч із сейвом: логін того, кому він належить.
+ * Порожньо — значить, грали без акаунта (гостем).
+ *
+ * ⚠️ Навіщо це знадобилось. Спершу правило синхронізації було просте —
+ * «перемагає той сейв, де далі зайшли». І воно одразу дало збій: на
+ * телефоні Даші лежала стара ГОСТЬОВА гра на 8-му дні, а в акаунті було 4.
+ * Правило чесно порівняло 8 > 4 і лишило чужу гру замість акаунтної.
+ *
+ * Тепер спершу питаємо «а чий це сейв?» — і лише для СВОГО порівнюємо дні.
+ */
+const SAVE_OWNER_KEY = 'studlife_save_owner';
+
+function apiSaveOwner() {
+  try { return localStorage.getItem(SAVE_OWNER_KEY) || ''; } catch (e) { return ''; }
+}
+
+function apiMarkSaveOwner() {
+  try {
+    if (apiLoggedIn()) localStorage.setItem(SAVE_OWNER_KEY, apiState.user.username);
+  } catch (e) { /* приватне вікно — переживемо */ }
+}
+
+/** Забути місцевий сейв (вихід з акаунта). */
+function apiForgetLocalSave() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(SAVE_OWNER_KEY);
+  } catch (e) { /* нічого страшного */ }
+}
 
 /** Який день лежить у місцевому сейві. 0 — сейва нема. */
 function apiLocalDay() {
@@ -277,14 +311,35 @@ function apiLocalDay() {
  *   місцевий попереду → лишаємо місцевий, а на сервер він поїде сам,
  *                       щойно гравець продовжить гру
  *
- * Чому не питаємо гравця «який лишити»: у 99 випадках зі 100 відповідь
- * очевидна — той, де більше зіграно. Зайве вікно тут лише лякало б.
+ * ПОВНЕ ПРАВИЛО (три випадки, і порядок важливий):
+ *
+ *   1. Місцевого сейва нема          → беремо серверний.
+ *   2. Місцевий НЕ ЦЬОГО гравця
+ *      (гостьовий або чужий)         → питаємо гравця, що робити.
+ *   3. Місцевий свій                 → перемагає той, де далі зайшли.
+ *
+ * Другий випадок і є тим, на чому ми обпеклись двічі. Мовчки затирати
+ * не можна в жодну сторону: і гостьова гра на 8-му дні, і акаунтна на
+ * 4-му — обидві чиясь справжня робота. Тому тут єдиний правильний хід —
+ * запитати.
+ *
+ * Повертає, що сталося: 'applied' | 'kept-local' | 'conflict'.
  */
 function apiSyncRun(run) {
+  if (!run) return 'kept-local';           // на сервері нічого — лишаємо як є
+
   const localDay = apiLocalDay();
-  if (!run) return false;                 // на сервері нічого — лишаємо як є
-  if (localDay > run.day) return false;   // місцевий далі — НЕ чіпаємо
-  return apiApplyServerSave(run);
+  if (!localDay) {                          // тут ще не грали
+    apiApplyServerSave(run);
+    return 'applied';
+  }
+
+  const mine = apiLoggedIn() && apiSaveOwner() === apiState.user.username;
+  if (!mine) return 'conflict';             // гостьова або чужа гра — хай вирішує людина
+
+  if (localDay > run.day) return 'kept-local';
+  apiApplyServerSave(run);
+  return 'applied';
 }
 
 /** Забрати з сервера незакінчену гру. null — немає такої. */
@@ -320,6 +375,8 @@ async function apiPushNow() {
     }
 
     apiState.lastPushOk = res.ok;
+    // сейв доїхав — отже, ця гра тепер офіційно належить цьому акаунту
+    if (res.ok) apiMarkSaveOwner();
     if (!res.ok) {
       apiState.lastError = apiErrorText(res, `сервер відповів ${res.status}`);
       console.warn('Сейв не поїхав на сервер:', apiState.lastError);
@@ -411,7 +468,10 @@ async function apiBoot() {
   // залогінені: забираємо свій прогрес із сервера
   try {
     const run = await apiLoadRun();
-    if (run) apiSyncRun(run);
+    if (run && apiSyncRun(run) === 'conflict') {
+      showSaveConflictScreen(run); // у браузері чужа/гостьова гра — хай обере
+      return;
+    }
   } catch (e) { /* не забрали — зіграємо на місцевому */ }
 
   showStartScreen();
