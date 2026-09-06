@@ -790,9 +790,6 @@ function showConnectingScreen() {
     <div class="window start">
       <h1 class="start-title">Складнощі студентського життя</h1>
       <p class="dim">🪳 Завантажуємо всіх тарганів у гуртожитку<span class="dots"><span>.</span><span>.</span><span>.</span></span></p>
-      <p class="dim start-hint">
-        Сервер міг заснути — перше пробудження триває до хвилини
-      </p>
       <button class="btn btn-secondary" id="boot-skip">Грати без акаунта</button>
     </div>`);
 
