@@ -786,7 +786,7 @@ function showAuthScreen(mode = 'login', message = '') {
     // зайшли: забираємо свій прогрес із сервера в браузер
     try {
       const run = await apiLoadRun();
-      if (run) apiApplyServerSave(run);
+      if (run) apiSyncRun(run);
     } catch (e) { /* нема чого забирати — почнемо нову */ }
 
     showStartScreen();

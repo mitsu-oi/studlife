@@ -255,6 +255,38 @@ function apiApplyServerSave(run) {
 
 // ---------- ГРА НА СЕРВЕРІ ----------
 
+/** Який день лежить у місцевому сейві. 0 — сейва нема. */
+function apiLocalDay() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? (JSON.parse(raw).day || 0) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * ⚠️ ЗЛИТИ СЕРВЕРНИЙ СЕЙВ ІЗ МІСЦЕВИМ — і головне, НЕ ЗАТЕРТИ НОВІШИЙ.
+ *
+ * Баг, через який Даша втратила 4 дні гри: сервер відхиляв її сейви (через
+ * старий захист MAX_DAY_JUMP і назавжди лишався на дні 1), а при вході гра
+ * мовчки клала той серверний день 1 замість місцевого дня 4.
+ *
+ * ПРАВИЛО ТЕПЕР ПРОСТЕ Й ЗРОЗУМІЛЕ: перемагає той сейв, де ДАЛІ зайшли.
+ *   сервер попереду → беремо серверний (зайшли з іншого пристрою)
+ *   місцевий попереду → лишаємо місцевий, а на сервер він поїде сам,
+ *                       щойно гравець продовжить гру
+ *
+ * Чому не питаємо гравця «який лишити»: у 99 випадках зі 100 відповідь
+ * очевидна — той, де більше зіграно. Зайве вікно тут лише лякало б.
+ */
+function apiSyncRun(run) {
+  const localDay = apiLocalDay();
+  if (!run) return false;                 // на сервері нічого — лишаємо як є
+  if (localDay > run.day) return false;   // місцевий далі — НЕ чіпаємо
+  return apiApplyServerSave(run);
+}
+
 /** Забрати з сервера незакінчену гру. null — немає такої. */
 async function apiLoadRun() {
   if (!apiLoggedIn()) return null;
@@ -379,7 +411,7 @@ async function apiBoot() {
   // залогінені: забираємо свій прогрес із сервера
   try {
     const run = await apiLoadRun();
-    if (run) apiApplyServerSave(run);
+    if (run) apiSyncRun(run);
   } catch (e) { /* не забрали — зіграємо на місцевому */ }
 
   showStartScreen();
