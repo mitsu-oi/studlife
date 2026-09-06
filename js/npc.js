@@ -19,9 +19,74 @@ function questState() {
   return gameState.flags.quests;
 }
 
-function npcRandomLine(npc) {
-  const pool = gameState.stats.social < 30 ? npc.linesLow : npc.linesHigh;
+function npcPick(pool) {
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// чи лишились у цього сусіда квести, які він ще може запропонувати
+function npcHasQuestsLeft(npcId) {
+  if (typeof QUESTS === 'undefined') return false;
+  return QUESTS.some(q => q.npc === npcId && questOfferable(q));
+}
+
+function npcRandomLine(npc, npcId) {
+  if (gameState.stats.social < 30) return npcPick(npc.linesLow);
+
+  // ПЛІТКИ (ідея Даші): коли завдань від сусіда більше нема, він переказує
+  // новини гуртожитку замість того, щоб повторювати ті самі три репліки.
+  // Світ ніби живе й без гравця — а це найдешевший спосіб зробити кімнату
+  // населеною. Частіше за звичайні репліки, але не завжди, щоб не приїлось.
+  if (npc.gossip && npc.gossip.length && !npcHasQuestsLeft(npcId) && Math.random() < 0.65) {
+    return npcPick(npc.gossip);
+  }
+  return npcPick(npc.linesHigh);
+}
+
+// ---------- ВЗАЄМОДІЇ: що можна ЗРОБИТИ разом ----------
+//
+// Раніше клік по сусідові давав або квест, або репліку — тобто гравець міг
+// лише слухати. Тепер поруч із реплікою є 1–3 кнопки дії: повчитися разом,
+// принести чай, скинутись на вечір. Самі дії описані ДАНИМИ (NPC_DATA.actions
+// у data/quests.js), тому нові додаються без правок коду.
+
+// одна й та сама дія — раз на день: інакше «попросити пояснити матан»
+// перетворилось би на нескінченну кнопку +7 до навчання
+function npcActionState() {
+  if (!gameState.flags.npcActions) gameState.flags.npcActions = {};
+  return gameState.flags.npcActions;
+}
+
+function npcActionAvailable(npcId, action) {
+  if (action.phases && !action.phases.includes(gameState.phase)) return false;
+  if (!action.oncePerDay) return true;
+  return npcActionState()[`${npcId}_${action.id}`] !== gameState.day;
+}
+
+function npcDoAction(npc, npcId, action) {
+  if (action.oncePerDay) npcActionState()[`${npcId}_${action.id}`] = gameState.day;
+
+  for (const [stat, delta] of Object.entries(action.effects || {})) changeStat(stat, delta);
+  renderHUD();
+  saveGame();
+
+  showDialog(npc, `<p class="dialog-say">${action.result}</p>
+    ${effectChipsHtml(action.effects)}`,
+    [{ label: 'Ок', onClick: hideOverlay }]);
+}
+
+// кнопки дій для діалогу: недоступні показуємо сірими з причиною
+function npcActionButtons(npc, npcId) {
+  if (!npc.actions) return [];
+  return npc.actions
+    .filter(a => npcActionAvailable(npcId, a))
+    .map(a => {
+      const need = a.requires;
+      if (need && gameState.stats[need.stat] < need.gte) {
+        return { label: a.label, locked: true,
+                 reason: `потрібно ${STAT_ICONS[need.stat]} ≥ ${need.gte}` };
+      }
+      return { label: a.label, onClick: () => npcDoAction(npc, npcId, a) };
+    });
 }
 
 // ---------- відкриття діалогу за станом ----------
@@ -50,9 +115,12 @@ function openNpcDialog(npcId) {
     && questOfferable(q) && gameState.stats.social >= q.minSocial);
   if (offer) { showQuestOffer(npc, offer); return; }
 
-  // 4) інакше — просто балачка (низька 👥 → сухо відмахнеться)
-  showDialog(npc, `<p class="dialog-say">${npcRandomLine(npc)}</p>`,
-    [{ label: 'Бувай', onClick: hideOverlay }]);
+  // 4) інакше — балачка (низька 👥 → сухо відмахнеться) плюс дії, які
+  //    можна зробити разом. При низькій соціалці дій не пропонуємо:
+  //    людина, яка щойно відмахнулась, не сяде з тобою вчитися.
+  const actions = gameState.stats.social < 30 ? [] : npcActionButtons(npc, npcId);
+  showDialog(npc, `<p class="dialog-say">${npcRandomLine(npc, npcId)}</p>`,
+    [...actions, { label: 'Бувай', secondary: true, onClick: hideOverlay }]);
 }
 
 // пропозиція квесту: текст + кнопки «прийняти / відмовитись»

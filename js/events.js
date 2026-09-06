@@ -131,6 +131,15 @@ function pickAiCard(phase) {
   if (typeof aiTakeCard !== 'function') return null; // ai.js не підключено
   if (phase === 'night') return null;
   if (phase === 'morning' && isWeekend(gameState.day)) return null; // ранок вихідного — свій
+
+  // ⚠️ Порядок важливий: спершу дивимось, чи взагалі Є готова картка,
+  // і лише тоді кидаємо монетку. Якщо кидати наосліп, «спроба» згорає
+  // на фазах, де картка ще в дорозі, — і ШІ виходить помітно рідше,
+  // ніж написано в AI_SHARE.
+  if (typeof aiHasCardFor === 'function' && !aiHasCardFor(phase)) {
+    if (typeof aiPrefetch === 'function') aiPrefetch(); // замовляємо на потім
+    return null;
+  }
   if (!aiWantsTurn()) return null;                   // цю фазу веде рукописна
   return aiTakeCard(phase);
 }
