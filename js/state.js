@@ -11,12 +11,15 @@ const CONFIG = {
   SCENE_WIDTH: 1672,
   SCENE_HEIGHT: 941,
   TOTAL_DAYS: 30,
-  START_STATS: {
-    money: 1500, // 💰 гривні
+  // ⚠️ Стартові значення живуть у data/balance.js — там усі числа складності
+  // зібрані в одному місці. Тут лише запасний варіант на випадок, якщо той
+  // файл не підключили (щоб гра не впала).
+  START_STATS: (typeof BALANCE !== 'undefined') ? { ...BALANCE.start } : {
+    money: 1100, // 💰 гривні
     energy: 70,  // ⚡ 0–100
     mental: 70,  // 🧠 0–100
     social: 50,  // 👥 0–100
-    study: 60,   // 📚 0–100
+    study: 55,   // 📚 0–100
   },
 };
 
@@ -96,8 +99,28 @@ function startNewDay() {
   // (див. DAY_MODE_BY_COUNT у js/events.js)
   gameState.flags.dayMode = 'home';
   if (gameState.day > CONFIG.TOTAL_DAYS) return 'finale';
-  if (isWeekend(gameState.day)) changeStat('energy', +15); // виспався!
-  if (gameState.stats.money <= 0) changeStat('mental', -5); // голодний студент — сумний студент
+
+  // ---------- ЩОДЕННІ ВИТРАТИ (data/balance.js) ----------
+  // ⚠️ Найважливіше в балансі гри. Раніше цього не було зовсім: шкали
+  // мінялись лише від карток, а картки часто дають плюси — тому час сам
+  // по собі ні на що не тиснув, і гра відчувалась легкою (фідбек тата Даші).
+  //
+  // Тепер щоранку списується їжа й потроху осипаються шкали. Це створює
+  // ПОСТІЙНИЙ фон, який треба наздоганяти: підробіток заради грошей,
+  // сон заради енергії, люди заради настрою, пари заради навчання.
+  if (typeof BALANCE !== 'undefined') {
+    for (const [stat, delta] of Object.entries(BALANCE.daily)) changeStat(stat, delta);
+  }
+
+  if (isWeekend(gameState.day)) {
+    changeStat('energy', BALANCE ? BALANCE.weekendEnergy : +12); // виспався!
+  }
+
+  // грошей не лишилось — це вже голод, а не просто сум
+  if (gameState.stats.money <= 0 && typeof BALANCE !== 'undefined') {
+    changeStat('mental', BALANCE.broke.mental);
+    changeStat('energy', BALANCE.broke.energy);
+  }
   // тривалі ефекти невирішених форс-мажорів (труба тече, інтернету нема…)
   if (typeof applyLastingForceMajeure === 'function') applyLastingForceMajeure();
   // 🖨️ мікробізнес: чи буде сьогодні замовлення або проблема з принтером
