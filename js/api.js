@@ -53,7 +53,11 @@ const API_ENABLED = true;
 // Скільки чекати відповіді, поки не махнути рукою (мс).
 // 45 секунд — бо на безкоштовному Render сервер засинає після 15 хвилин
 // тиші й перше звернення будить його майже хвилину.
-const API_TIMEOUT_MS = 45000;
+// ⚠️ 90 секунд, а не 45. Render на своїй же сторінці попереджає:
+// «can delay requests by 50 seconds or more». Ми чекали 45 — тобто здавались
+// рівно за мить до того, як сервер устигав прокинутись, і гравець бачив
+// помилку там, де треба було просто трохи почекати.
+const API_TIMEOUT_MS = 90000;
 
 // Пауза перед відправкою сейва на сервер (мс).
 // Навіщо: за один хід гра може викликати saveGame() кілька разів поспіль.
@@ -206,21 +210,44 @@ async function apiMe() {
   return apiState.user;
 }
 
+/**
+ * ⚠️ ЗАПИТ ІЗ ПОВТОРОМ — для входу й реєстрації.
+ *
+ * Сервер на безкоштовному Render засинає, і перше звернення його БУДИТЬ.
+ * Саме воно часто не встигає — а от друге, за кілька секунд, іде вже до
+ * живого сервера й проходить миттєво.
+ *
+ * Раніше гравець отримував помилку й мусив тиснути «Увійти» вдруге сам,
+ * не розуміючи чому. Тепер гра робить цю другу спробу за нього.
+ *
+ * Повторюємо ТІЛЬКИ коли зв'язку не було (status 0). Якщо сервер відповів
+ * «пароль не той» — повторювати нема сенсу й шкідливо.
+ */
+async function apiFetchWithRetry(path, opts) {
+  let res = await apiFetch(path, opts);
+  if (res.status === 0) {
+    await new Promise(r => setTimeout(r, 2000)); // хай добудиться
+    res = await apiFetch(path, opts);
+  }
+  return res;
+}
+
 /** Реєстрація. Повертає { ok } або { ok: false, error: 'текст' }. */
 async function apiRegister(username, password) {
-  const res = await apiFetch('/api/auth/register', {
+  const res = await apiFetchWithRetry('/api/auth/register', {
     method: 'POST', body: { username, password },
   });
   if (res.ok && res.data) {
     apiState.user = res.data;
     return { ok: true };
   }
+  if (res.status === 0) return { ok: false, error: API_SLOW_TEXT };
   return { ok: false, error: apiErrorText(res, 'Не вдалося зареєструватись') };
 }
 
 /** Вхід. */
 async function apiLogin(username, password) {
-  const res = await apiFetch('/api/auth/login', {
+  const res = await apiFetchWithRetry('/api/auth/login', {
     method: 'POST', body: { username, password },
   });
   if (res.ok && res.data) {
@@ -228,11 +255,15 @@ async function apiLogin(username, password) {
     return { ok: true };
   }
   // 401 від входу — це не «сервер зламався», а «логін або пароль не той»
-  const msg = res.status === 401
-    ? 'Логін або пароль не підходять'
-    : apiErrorText(res, 'Не вдалося увійти');
-  return { ok: false, error: msg };
+  if (res.status === 401) return { ok: false, error: 'Логін або пароль не підходять' };
+  if (res.status === 0) return { ok: false, error: API_SLOW_TEXT };
+  return { ok: false, error: apiErrorText(res, 'Не вдалося увійти') };
 }
+
+// Людський текст замість «сервер не відповів вчасно»: гравцеві важливо
+// знати, що робити далі, а не як це називається технічно.
+const API_SLOW_TEXT = 'Не достукались 🪳 Спробуй ще раз — має спрацювати. '
+                    + 'Або тисни «Назад» і грай без акаунта.';
 
 /** Вихід. Сервер забуде номерок, ми забудемо і номерок, і користувача. */
 async function apiLogout() {
