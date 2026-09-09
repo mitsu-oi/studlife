@@ -836,6 +836,16 @@ function showConnectingScreen() {
  * один рядок пояснення, навіщо вона. Поля з'являються аж після вибору.
  */
 function showAuthChoiceScreen() {
+  // ⚠️ БУДИМО СЕРВЕР, ЩОЙНО ВІДКРИЛОСЬ ВІКНО ВХОДУ (прохання Даші).
+  //
+  // Раніше будильник спрацьовував лише при завантаженні гри. Але сюди
+  // можна прийти й посеред гри — натиснувши 👤 після години гри без
+  // акаунта. За цей час сервер устигає заснути, і перший же вхід
+  // упирається в довге пробудження.
+  //
+  // Тепер, поки гравець читає три кнопки й вирішує, сервер уже встає.
+  if (typeof apiWake === 'function') apiWake();
+
   showOverlay(`
     <div class="window start auth-window">
       <h1 class="start-title">Складнощі студентського життя</h1>
@@ -867,6 +877,8 @@ function showAuthChoiceScreen() {
 
 function showAuthScreen(mode = 'login', message = '') {
   const isLogin = mode === 'login';
+  // ще один поштовх: сюди можна потрапити й повз екран вибору
+  if (typeof apiWake === 'function') apiWake();
 
   showOverlay(`
     <div class="window start auth-window">
