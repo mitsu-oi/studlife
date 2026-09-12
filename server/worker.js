@@ -36,9 +36,9 @@ const MODEL = 'gemini-3.6-flash';
 // вичерпалась — беремо наступну, і гра просто грає далі.
 // Порядок = від найкращої до простішої. Додавай свої зі сторінки /models.
 const MODEL_CHAIN = [
-  'gemini-3.6-flash',      // найшвидша і найграмотніша, але ліміт малий
-  'gemini-3.5-flash',      // трохи повільніша (~6 сек), ліміт більший
-  'gemini-3.1-flash-lite', // простіша, зате майже завжди доступна
+    'gemini-3.6-flash',      // найшвидша і найграмотніша, але ліміт малий
+    'gemini-3.5-flash',      // трохи повільніша (~6 сек), ліміт більший
+    'gemini-3.1-flash-lite', // простіша, зате майже завжди доступна
 ];
 
 // Межі, у які ЗАВЖДИ втискаємо числа від ШІ.
@@ -232,34 +232,34 @@ const GAME_LORE = `
 // Це «бланк», який ШІ мусить заповнити. Завдяки йому він не може повернути
 // щось несподіване — тільки строго такий вигляд.
 const CARD_SCHEMA = {
-  type: 'object',
-  properties: {
-    text: { type: 'string', description: 'Ситуація, 1-2 речення, з емодзі на початку' },
-    choices: {
-      type: 'array',
-      minItems: 2,
-      maxItems: 3,
-      items: {
-        type: 'object',
-        properties: {
-          label: { type: 'string', description: 'Напис на кнопці, з емодзі' },
-          result: { type: 'string', description: 'Наслідок вибору, 1 речення' },
-          effects: {
-            type: 'object',
-            properties: {
-              money: { type: 'integer' },
-              energy: { type: 'integer' },
-              mental: { type: 'integer' },
-              social: { type: 'integer' },
-              study: { type: 'integer' },
+    type: 'object',
+    properties: {
+        text: { type: 'string', description: 'Ситуація, 1-2 речення, з емодзі на початку' },
+        choices: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 3,
+            items: {
+                type: 'object',
+                properties: {
+                    label: { type: 'string', description: 'Напис на кнопці, з емодзі' },
+                    result: { type: 'string', description: 'Наслідок вибору, 1 речення' },
+                    effects: {
+                        type: 'object',
+                        properties: {
+                            money: { type: 'integer' },
+                            energy: { type: 'integer' },
+                            mental: { type: 'integer' },
+                            social: { type: 'integer' },
+                            study: { type: 'integer' },
+                        },
+                    },
+                },
+                required: ['label', 'result', 'effects'],
             },
-          },
         },
-        required: ['label', 'result', 'effects'],
-      },
     },
-  },
-  required: ['text', 'choices'],
+    required: ['text', 'choices'],
 };
 
 // ============================================
@@ -271,90 +271,90 @@ const CARD_SCHEMA = {
 // Пробує моделі по черзі: якщо в однієї скінчився денний ліміт (429) —
 // мовчки бере наступну. Гравець нічого не помічає, гра грає далі.
 async function callLLM(prompt, env, modelOverride, thinkingOverride) {
-  // modelOverride — щоб можна було ПОРІВНЯТИ моделі, не переробляючи код:
-  // у запиті вказуєш "model": "gemini-3.5-flash" і пише саме вона (без запасних).
-  // Дозволяємо тільки Gemini, щоб через відкриту адресу не пхнули щось чуже.
-  const chain = (modelOverride && /^gemini-[a-z0-9.\-]+$/i.test(modelOverride))
-    ? [modelOverride]
-    : MODEL_CHAIN;
+    // modelOverride — щоб можна було ПОРІВНЯТИ моделі, не переробляючи код:
+    // у запиті вказуєш "model": "gemini-3.5-flash" і пише саме вона (без запасних).
+    // Дозволяємо тільки Gemini, щоб через відкриту адресу не пхнули щось чуже.
+    const chain = (modelOverride && /^gemini-[a-z0-9.\-]+$/i.test(modelOverride))
+        ? [modelOverride]
+        : MODEL_CHAIN;
 
-  let lastError;
-  for (const model of chain) {
-    try {
-      return await callOneModel(prompt, env, model, thinkingOverride);
-    } catch (e) {
-      lastError = e;
-      // 429 = «вичерпано ліміт цієї моделі» → пробуємо наступну.
-      // Інші помилки (зв'язок, таймаут) — теж пробуємо, раптом пощастить.
-      if (!/помилкою 429/.test(e.message) && chain.length > 1) continue;
+    let lastError;
+    for (const model of chain) {
+        try {
+            return await callOneModel(prompt, env, model, thinkingOverride);
+        } catch (e) {
+            lastError = e;
+            // 429 = «вичерпано ліміт цієї моделі» → пробуємо наступну.
+            // Інші помилки (зв'язок, таймаут) — теж пробуємо, раптом пощастить.
+            if (!/помилкою 429/.test(e.message) && chain.length > 1) continue;
+        }
     }
-  }
-  throw lastError;
+    throw lastError;
 }
 
 async function callOneModel(prompt, env, model, thinkingOverride) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-  // Захист від зависання: якщо ШІ не відповів за 25 секунд — обриваємо самі,
-  // і гра спокійно бере звичайну картку. Краще так, ніж гравець дивиться
-  // на порожній екран пів хвилини.
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), 25000);
+    // Захист від зависання: якщо ШІ не відповів за 25 секунд — обриваємо самі,
+    // і гра спокійно бере звичайну картку. Краще так, ніж гравець дивиться
+    // на порожній екран пів хвилини.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 25000);
 
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      signal: abort.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': env.GEMINI_API_KEY, // ключ підставляє Cloudflare, у коді його нема
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: CARD_SCHEMA, // змушуємо ШІ відповісти строго за бланком
-          temperature: 1.1,            // трохи більше фантазії, щоб картки не були однакові
-          // Скільки місця даємо на відповідь. Було 900 — і ШІ не встигав
-          // дописати картку: обривало посеред речення, гра не могла її
-          // прочитати («Unterminated string in JSON»). Причини: «думання»
-          // з'їдає частину цього ж ліміту, українська витрачає більше за
-          // англійську, а ранкова картка з трьома варіантами довга.
-          // Ставимо з великим запасом — зайве однаково не витрачається.
-          maxOutputTokens: 3000,
-          // Скільки моделі «думати» перед відповіддю (0 = не думати зовсім).
-          // Думання = модель спершу міркує про себе, потім пише. Дає грамотніший
-          // текст, але з'їдає час. THINKING_BUDGET угорі файлу — крути там.
-          thinkingConfig: {
-            thinkingBudget: Number.isInteger(thinkingOverride) ? thinkingOverride : THINKING_BUDGET,
-          },
-        },
-      }),
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+    let response;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            signal: abort.signal,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': env.GEMINI_API_KEY, // ключ підставляє Cloudflare, у коді його нема
+            },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: 'application/json',
+                    responseSchema: CARD_SCHEMA, // змушуємо ШІ відповісти строго за бланком
+                    temperature: 1.1,            // трохи більше фантазії, щоб картки не були однакові
+                    // Скільки місця даємо на відповідь. Було 900 — і ШІ не встигав
+                    // дописати картку: обривало посеред речення, гра не могла її
+                    // прочитати («Unterminated string in JSON»). Причини: «думання»
+                    // з'їдає частину цього ж ліміту, українська витрачає більше за
+                    // англійську, а ранкова картка з трьома варіантами довга.
+                    // Ставимо з великим запасом — зайве однаково не витрачається.
+                    maxOutputTokens: 3000,
+                    // Скільки моделі «думати» перед відповіддю (0 = не думати зовсім).
+                    // Думання = модель спершу міркує про себе, потім пише. Дає грамотніший
+                    // текст, але з'їдає час. THINKING_BUDGET угорі файлу — крути там.
+                    thinkingConfig: {
+                        thinkingBudget: Number.isInteger(thinkingOverride) ? thinkingOverride : THINKING_BUDGET,
+                    },
+                },
+            }),
+        });
+    } finally {
+        clearTimeout(timer);
+    }
 
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`ШІ відповів помилкою ${response.status}: ${details.slice(0, 200)}`);
-  }
+    if (!response.ok) {
+        const details = await response.text();
+        throw new Error(`ШІ відповів помилкою ${response.status}: ${details.slice(0, 200)}`);
+    }
 
-  const data = await response.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error('ШІ повернув порожню відповідь');
+    const data = await response.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!raw) throw new Error('ШІ повернув порожню відповідь');
 
-  try {
-    return { card: JSON.parse(raw), model }; // model — щоб було видно, хто писав
-  } catch (e) {
-    // Найчастіша причина — відповідь обірвалась на півслові (забракло місця).
-    // Кажемо про це людською мовою, а не «Unterminated string in JSON».
-    const why = data?.candidates?.[0]?.finishReason === 'MAX_TOKENS'
-      ? 'ШІ не встиг дописати картку (замало місця — підніми maxOutputTokens)'
-      : 'ШІ відповів не по формату';
-    throw new Error(why);
-  }
+    try {
+        return { card: JSON.parse(raw), model }; // model — щоб було видно, хто писав
+    } catch (e) {
+        // Найчастіша причина — відповідь обірвалась на півслові (забракло місця).
+        // Кажемо про це людською мовою, а не «Unterminated string in JSON».
+        const why = data?.candidates?.[0]?.finishReason === 'MAX_TOKENS'
+            ? 'ШІ не встиг дописати картку (замало місця — підніми maxOutputTokens)'
+            : 'ШІ відповів не по формату';
+        throw new Error(why);
+    }
 }
 
 // Теми, з яких код САМ обирає одну для кожної картки.
@@ -369,73 +369,95 @@ async function callOneModel(prompt, env, model, thinkingOverride) {
 // Без where — тема доречна завжди.
 // Це рятує від нісенітниць: субота, а картка «летиш на пару в 4-й корпус».
 const TOPICS = [
-  { key: 'study',      where: ['university'],
-    hint: 'навчання в універі: пара, лаба, викладач, залік, староста' },
-  { key: 'road',       where: ['university'],
-    hint: 'дорога і корпуси: трамвай, перебіжка між парами, запізнення на пару' },
-  { key: 'canteen',    where: ['university'],
-    hint: 'їдальня «Годівничка», булочки 4-го і 5-го корпусів, черга на перерві' },
+    {
+        key: 'study', where: ['university'],
+        hint: 'навчання в універі: пара, лаба, викладач, залік, староста'
+    },
+    {
+        key: 'road', where: ['university'],
+        hint: 'дорога і корпуси: трамвай, перебіжка між парами, запізнення на пару'
+    },
+    {
+        key: 'canteen', where: ['university'],
+        hint: 'їдальня «Годівничка», булочки 4-го і 5-го корпусів, черга на перерві'
+    },
 
-  { key: 'work_day',   where: ['work'],
-    hint: 'підробіток: зміна, колеги, клієнти, старший, оплата' },
+    {
+        key: 'work_day', where: ['work'],
+        hint: 'підробіток: зміна, колеги, клієнти, старший, оплата'
+    },
 
-  { key: 'study_home', where: ['home', 'weekend', 'work'],
-    hint: 'навчання САМОСТІЙНО (пар сьогодні нема): конспекти, методичка, домашка, бібліотека, підготовка до сесії' },
-  { key: 'chill',      where: ['home', 'weekend'],
-    hint: 'вільний день: серіали, ігри, безділля, розбір завалів у кімнаті' },
+    {
+        key: 'study_home', where: ['home', 'weekend', 'work'],
+        hint: 'навчання САМОСТІЙНО (пар сьогодні нема): конспекти, методичка, домашка, бібліотека, підготовка до сесії'
+    },
+    {
+        key: 'chill', where: ['home', 'weekend'],
+        hint: 'вільний день: серіали, ігри, безділля, розбір завалів у кімнаті'
+    },
 
-  // доречні будь-коли
-  { key: 'food',       hint: 'їжа: кухня в общазі, готування, мівіна, магазин' },
-  { key: 'money',      hint: 'гроші: економія, несподівані витрати, борги' },
-  { key: 'people',     hint: 'люди: одногрупники, друзі, знайомства, допомога, непорозуміння' },
-  { key: 'dorm',       hint: 'побут общаги: комендант, сусіди за стіною, пральки, черги' },
-  { key: 'vakhta',     hint: 'вахта на вході: пані Марія / пані Аня / дід на зміні, перепустка, пізнє повернення, гість, задобрити гостинцем' },
-  { key: 'lift',       hint: 'ліфт в «Одинадцятці» не працює: пішки на 9-й поверх, з пакетами, черга біля дверей, застряг між поверхами' },
-  { key: 'lviv',       hint: 'Львів: кава, погода, центр, прогулянка, бруківка' },
-  { key: 'life',       hint: 'дрібниці життя: сон, телефон, безлад у кімнаті, спорт, здоров\'я' },
-  { key: 'roommates',  hint: 'сусіди по кімнаті: Ботан або Тусовщик щось затіяли' },
-  { key: 'block',      hint: 'життя блоку: спільний душ і туалет на дві кімнати, '
-                           + 'черга вранці, сусіди з другої кімнати, спільне прибирання' },
-  { key: 'repairman',  hint: 'щось у блоці зламалось: зошит заявок на вахті, пошуки '
-                           + 'сантехніка/електрика/столяра по общазі, тимчасові рішення' },
-  { key: 'stepan',     hint: 'Степан — четвертий мешканець, якого нема: пише в чат '
-                           + '«11 садиба», кличе кудись, лишається загадкою' },
-  { key: 'surprise',   hint: 'несподіванка: дрібна пригода, яка зіпсувала або врятувала день' },
+    // доречні будь-коли
+    { key: 'food', hint: 'їжа: кухня в общазі, готування, мівіна, магазин' },
+    { key: 'money', hint: 'гроші: економія, несподівані витрати, борги' },
+    { key: 'people', hint: 'люди: одногрупники, друзі, знайомства, допомога, непорозуміння' },
+    { key: 'dorm', hint: 'побут общаги: комендант, сусіди за стіною, пральки, черги' },
+    { key: 'vakhta', hint: 'вахта на вході: пані Марія / пані Аня / дід на зміні, перепустка, пізнє повернення, гість, задобрити гостинцем' },
+    { key: 'lift', hint: 'ліфт в «Одинадцятці» не працює: пішки на 9-й поверх, з пакетами, черга біля дверей, застряг між поверхами' },
+    { key: 'lviv', hint: 'Львів: кава, погода, центр, прогулянка, бруківка' },
+    { key: 'life', hint: 'дрібниці життя: сон, телефон, безлад у кімнаті, спорт, здоров\'я' },
+    { key: 'roommates', hint: 'сусіди по кімнаті: Ботан або Тусовщик щось затіяли' },
+    {
+        key: 'block', hint: 'життя блоку: спільний душ і туалет на дві кімнати, '
+            + 'черга вранці, сусіди з другої кімнати, спільне прибирання'
+    },
+    {
+        key: 'repairman', hint: 'щось у блоці зламалось: зошит заявок на вахті, пошуки '
+            + 'сантехніка/електрика/столяра по общазі, тимчасові рішення'
+    },
+    {
+        key: 'stepan', hint: 'Степан — четвертий мешканець, якого нема: пише в чат '
+            + '«11 садиба», кличе кудись, лишається загадкою'
+    },
+    { key: 'surprise', hint: 'несподіванка: дрібна пригода, яка зіпсувала або врятувала день' },
 
-  // Реалії воєнного часу. phases обмежує час доби: комендантська має сенс
-  // лише ввечері, тривога вночі — теж (удень вона теж буває, але в грі
-  // вечірня фаза й є «пізній час»).
-  { key: 'alert', phases: ['evening'],
-    hint: 'нічна повітряна тривога: спускатись в укриття чи ні, недосип, '
-        + 'черга на сходах, розмови в підвалі. БУДЕННО, без драми' },
-  { key: 'curfew', phases: ['evening'],
-    hint: 'комендантська о 00:00: не встиг додому, магазини вже зачинені, '
-        + 'спробувати попроситись на вахті або ночувати в друга' },
+    // Реалії воєнного часу. phases обмежує час доби: комендантська має сенс
+    // лише ввечері, тривога вночі — теж (удень вона теж буває, але в грі
+    // вечірня фаза й є «пізній час»).
+    {
+        key: 'alert', phases: ['evening'],
+        hint: 'нічна повітряна тривога: спускатись в укриття чи ні, недосип, '
+            + 'черга на сходах, розмови в підвалі. БУДЕННО, без драми'
+    },
+    {
+        key: 'curfew', phases: ['evening'],
+        hint: 'комендантська о 00:00: не встиг додому, магазини вже зачинені, '
+            + 'спробувати попроситись на вахті або ночувати в друга'
+    },
 ];
 
 // Де гравець сьогодні. Вихідний важливіший за все: пар просто нема.
 function playerPlace(state) {
-  if (state.isWeekend) return 'weekend';
-  return state.dayMode || 'home'; // гра надсилає dayMode (js/ai.js)
+    if (state.isWeekend) return 'weekend';
+    return state.dayMode || 'home'; // гра надсилає dayMode (js/ai.js)
 }
 
 // Вибрати тему: спершу лишаємо доречні для місця, тоді викидаємо ті,
 // що вже були нещодавно.
 function pickTopic(recentTopics = [], place = 'home', phase = 'day') {
-  const fitting = TOPICS.filter((t) =>
-    (!t.where || t.where.includes(place)) &&      // доречна там, де гравець
-    (!t.phases || t.phases.includes(phase)));     // і в цей час доби
-  const fresh = fitting.filter((t) => !recentTopics.includes(t.key));
-  const pool = fresh.length ? fresh : fitting;
-  return pool[Math.floor(Math.random() * pool.length)];
+    const fitting = TOPICS.filter((t) =>
+        (!t.where || t.where.includes(place)) &&      // доречна там, де гравець
+        (!t.phases || t.phases.includes(phase)));     // і в цей час доби
+    const fresh = fitting.filter((t) => !recentTopics.includes(t.key));
+    const pool = fresh.length ? fresh : fitting;
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Пояснення для ШІ, де гравець і чого писати НЕ МОЖНА.
 const PLACE_RULES = {
-  university: 'Гравець СЬОГОДНІ В УНІВЕРІ (пішов на пари). Доречні корпуси, аудиторії, викладачі, перерви.',
-  work: 'Гравець СЬОГОДНІ НА ПІДРОБІТКУ — пари він прогуляв. ЗАБОРОНЕНО писати, що він на парі, в аудиторії чи біжить між корпусами.',
-  home: 'Гравець СЬОГОДНІ В ОБЩАЗІ — на пари не пішов. ЗАБОРОНЕНО писати, що він на парі, в аудиторії чи в корпусі.',
-  weekend: 'СЬОГОДНІ ВИХІДНИЙ — пар НЕМА ні в кого. КАТЕГОРИЧНО ЗАБОРОНЕНО згадувати пари, лекції, аудиторії, старосту, перерви, дорогу в корпус. Про навчання можна — але тільки самостійне: конспекти, методичка, підготовка, бібліотека.',
+    university: 'Гравець СЬОГОДНІ В УНІВЕРІ (пішов на пари). Доречні корпуси, аудиторії, викладачі, перерви.',
+    work: 'Гравець СЬОГОДНІ НА ПІДРОБІТКУ — пари він прогуляв. ЗАБОРОНЕНО писати, що він на парі, в аудиторії чи біжить між корпусами.',
+    home: 'Гравець СЬОГОДНІ В ОБЩАЗІ — на пари не пішов. ЗАБОРОНЕНО писати, що він на парі, в аудиторії чи в корпусі.',
+    weekend: 'СЬОГОДНІ ВИХІДНИЙ — пар НЕМА ні в кого. КАТЕГОРИЧНО ЗАБОРОНЕНО згадувати пари, лекції, аудиторії, старосту, перерви, дорогу в корпус. Про навчання можна — але тільки самостійне: конспекти, методичка, підготовка, бібліотека. НЕ уточнюй чи це субота чи неділя, пиши просто вихідний.',
 };
 
 // ---------- РАНКОВА картка: особливий випадок ----------
@@ -468,18 +490,18 @@ const MORNING_INSTRUCTION = `
 //   recentTopics  — теми останніх карток (щоб не повторювати теми)
 //   recentChoices — ЩО ГРАВЕЦЬ ОБИРАВ: [{ situation, chose }]
 function buildPrompt(state) {
-  const s = state.stats || {};
-  const phaseName = { day: 'день', evening: 'вечір', morning: 'ранок' }[state.phase] || 'день';
-  const dayType = state.isWeekend ? 'вихідний' : 'будній день';
-  const place = playerPlace(state);
-  const topic = pickTopic(state.recentTopics, place);
-  const isMorning = state.phase === 'morning' && !state.isWeekend;
+    const s = state.stats || {};
+    const phaseName = { day: 'день', evening: 'вечір', morning: 'ранок' }[state.phase] || 'день';
+    const dayType = state.isWeekend ? 'вихідний' : 'будній день';
+    const place = playerPlace(state);
+    const topic = pickTopic(state.recentTopics, place);
+    const isMorning = state.phase === 'morning' && !state.isWeekend;
 
-  // ранок ведемо окремою гілкою: там жорстка структура, теми й продовження
-  // не потрібні (обставини ранку самі по собі — тема)
-  if (isMorning) {
-    return {
-      prompt: `${GAME_LORE}
+    // ранок ведемо окремою гілкою: там жорстка структура, теми й продовження
+    // не потрібні (обставини ранку самі по собі — тема)
+    if (isMorning) {
+        return {
+            prompt: `${GAME_LORE}
 
 ЗАРАЗ У ГРІ:
 - День ${state.day || 1} з 30, будній ранок
@@ -489,28 +511,29 @@ function buildPrompt(state) {
 при ⚡ більше 70 не пиши, що він розбитий; при 🧠 більше 70 — що все погано.
 Врахувати стан можна (мало енергії — вставати важче; мало грошей — сильніше
 тягне на підробіток; низька менталочка — ранок сірий), вигадувати
-протилежне — ні.
+протилежне — ні. НЕ використовуй назви днів, пиши просто будній день, або вихідний при необхідності.
+
 ${state.recentTexts?.length ? `\nЦі ранки вже були, вигадай ІНШІ обставини:\n${state.recentTexts.map((t) => `- ${t}`).join('\n')}` : ''}
 
 ${MORNING_INSTRUCTION}`,
-      topicKey: 'morning',
-      morning: true,
-    };
-  }
+            topicKey: 'morning',
+            morning: true,
+        };
+    }
 
-  // Історія виборів. Використовуємо її ДВОМА способами:
-  //  1) ПРОДОВЖЕННЯ — картка-наслідок останнього вибору (ідея Даші):
-  //     пішов додому під дощем → тепер усе мокре, треба прати або позичати.
-  //     Так вибори зчіплюються в історію, а не висять окремо.
-  //  2) ХАРАКТЕР — просто врахувати, який це гравець, без прямих згадок.
-  // Чому не завжди продовження: якщо КОЖНА картка чіплятиметься за попередню,
-  // гра стане передбачуваною і задушливою. Тому вмикаємо його час від часу.
-  const last = state.recentChoices?.[0];
-  const wantFollowUp = last && Math.random() < FOLLOWUP_CHANCE;
+    // Історія виборів. Використовуємо її ДВОМА способами:
+    //  1) ПРОДОВЖЕННЯ — картка-наслідок останнього вибору (ідея Даші):
+    //     пішов додому під дощем → тепер усе мокре, треба прати або позичати.
+    //     Так вибори зчіплюються в історію, а не висять окремо.
+    //  2) ХАРАКТЕР — просто врахувати, який це гравець, без прямих згадок.
+    // Чому не завжди продовження: якщо КОЖНА картка чіплятиметься за попередню,
+    // гра стане передбачуваною і задушливою. Тому вмикаємо його час від часу.
+    const last = state.recentChoices?.[0];
+    const wantFollowUp = last && Math.random() < FOLLOWUP_CHANCE;
 
-  let choicesBlock = '';
-  if (wantFollowUp) {
-    choicesBlock = `\nОСТАННЄ, ЩО ЗРОБИВ ГРАВЕЦЬ:
+    let choicesBlock = '';
+    if (wantFollowUp) {
+        choicesBlock = `\nОСТАННЄ, ЩО ЗРОБИВ ГРАВЕЦЬ:
 ситуація «${last.situation}» → він обрав «${last.chose}»
 
 ЗАВДАННЯ: напиши картку-ПРОДОВЖЕННЯ — природний наслідок саме цього вибору,
@@ -524,8 +547,8 @@ ${MORNING_INSTRUCTION}`,
 - це має бути НОВА проблема з новим вибором, а не та сама ще раз;
 - якщо з того вибору жодного наслідку логічно не випливає — просто напиши
   звичайну нову картку на тему нижче, нічого не вигадуй силоміць.`;
-  } else if (state.recentChoices?.length) {
-    choicesBlock = `\nЩО ГРАВЕЦЬ ОБИРАВ ОСТАННІМ ЧАСОМ (від найновішого):
+    } else if (state.recentChoices?.length) {
+        choicesBlock = `\nЩО ГРАВЕЦЬ ОБИРАВ ОСТАННІМ ЧАСОМ (від найновішого):
 ${state.recentChoices.map((c) => `- ситуація «${c.situation}» → обрав «${c.chose}»`).join('\n')}
 
 Подумай, який це гравець (обережний чи ризиковий, економний чи щедрий,
@@ -533,10 +556,10 @@ ${state.recentChoices.map((c) => `- ситуація «${c.situation}» → об
 - дай варіант, який спокушає саме його звичкою;
 - і дай варіант, який цю звичку ставить під сумнів («а може, цього разу інакше?»).
 Цього разу минулі події прямо НЕ згадуй — просто хай картка відчувається доречною.`;
-  }
+    }
 
-  // повертаємо і завдання для ШІ, і назву теми — гра її запам'ятає в історії
-  const prompt = `${GAME_LORE}
+    // повертаємо і завдання для ШІ, і назву теми — гра її запам'ятає в історії
+    const prompt = `${GAME_LORE}
 
 ЗАРАЗ У ГРІ:
 - День ${state.day || 1} з 30, ${dayType}, фаза — ${phaseName}
@@ -550,10 +573,10 @@ ${state.recentChoices.map((c) => `- ситуація «${c.situation}» → об
 
 ❗ НЕ СУПЕРЕЧ ЦИМ ЧИСЛАМ. Картка не має заперечувати стан гравця:
 - ${state.roomMessy
-    ? 'кімната справді захаращена — про безлад писати можна'
-    : 'КІМНАТА ЧИСТА: не пиши про завали одягу, гори мотлоху, брудний посуд ' +
-      'чи «розгребти хаос». Безлад у грі з\'являється лише коли ⚡ або 🧠 падає ' +
-      'до 30, а зараз це не так — гравець побачить чисту кімнату й не зрозуміє картки'}
+            ? 'кімната справді захаращена — про безлад писати можна'
+            : 'КІМНАТА ЧИСТА: не пиши про завали одягу, гори мотлоху, брудний посуд ' +
+            'чи «розгребти хаос». Безлад у грі з\'являється лише коли ⚡ або 🧠 падає ' +
+            'до 30, а зараз це не так — гравець побачить чисту кімнату й не зрозуміє картки'}
 - при 💰 більше 1000 не пиши «грошей нема», «остання сотня», «нічим платити»
 - при 💰 менше 300 не пиши, що він щедро витрачає чи купує дороге
 - при ⚡ більше 70 не пиши, що він ледве стоїть на ногах
@@ -565,58 +588,58 @@ ${state.recentTexts?.length ? `\nЦі ситуації вже були, НЕ П�
 ${choicesBlock}
 
 ${wantFollowUp
-  ? `❗ ЦЕ КАРТКА-ПРОДОВЖЕННЯ. Тему не задаємо — вона випливає з наслідку
+            ? `❗ ЦЕ КАРТКА-ПРОДОВЖЕННЯ. Тему не задаємо — вона випливає з наслідку
 вибору вище. Пиши саме наслідок, не вигадуй ситуацію на іншу тему.`
-  : `ТЕМА ЦІЄЇ КАРТКИ (обов'язково пиши саме про це): ${topic.hint}`}
+            : `ТЕМА ЦІЄЇ КАРТКИ (обов'язково пиши саме про це): ${topic.hint}`}
 
 Напиши ОДНУ нову картку для цієї фази.`;
 
-  return { prompt, topicKey: topic.key };
+    return { prompt, topicKey: topic.key };
 }
 
 // ---------- Перевірка і «обрізання» того, що прийшло від ШІ ----------
 // Ніколи не довіряємо ШІ наосліп: перевіряємо форму і втискаємо числа в межі.
 function sanitizeCard(card, topicKey, isMorning) {
-  if (!card?.text || !Array.isArray(card.choices) || card.choices.length < 2) {
-    throw new Error('ШІ повернув картку неправильної форми');
-  }
-
-  const clamp = (value, limit) => {
-    const n = Math.round(Number(value) || 0);
-    return Math.max(-limit, Math.min(limit, n));
-  };
-
-  // Ранкові лічильники для фінальної статистики («пар відвідано», «днів на
-  // роботі», «разів проспав»). Ставимо ЗА ПОРЯДКОМ, бо порядок дій у ранковій
-  // картці жорстко заданий інструкцією.
-  const MORNING_COUNTERS = ['lectures', 'work', 'sleepIns'];
-
-  const choices = card.choices.slice(0, 3).map((choice, i) => {
-    const src = choice.effects || {};
-    const effects = {};
-    // беремо тільки відомі шкали — вигадані ШІ поля ігноруємо
-    for (const stat of ['energy', 'mental', 'social', 'study']) {
-      if (src[stat]) effects[stat] = clamp(src[stat], MAX_STAT_CHANGE);
+    if (!card?.text || !Array.isArray(card.choices) || card.choices.length < 2) {
+        throw new Error('ШІ повернув картку неправильної форми');
     }
-    if (src.money) effects.money = clamp(src.money, MAX_MONEY_CHANGE);
 
-    const out = {
-      label: String(choice.label || 'Хай буде').slice(0, 60),
-      result: String(choice.result || 'Сталося як сталося.').slice(0, 300),
-      effects,
+    const clamp = (value, limit) => {
+        const n = Math.round(Number(value) || 0);
+        return Math.max(-limit, Math.min(limit, n));
     };
-    if (isMorning && MORNING_COUNTERS[i]) out.count = MORNING_COUNTERS[i];
-    return out;
-  });
 
-  return {
-    id: `ai_${Date.now()}`, // унікальний номер, щоб двигун карток не плутався
-    ai: true,               // позначка «цю картку вигадав ШІ»
-    topic: topicKey,        // тема — гра запам'ятає, щоб не повторювати
-    ...(isMorning ? { morning: true } : {}),
-    text: String(card.text).slice(0, 400),
-    choices,
-  };
+    // Ранкові лічильники для фінальної статистики («пар відвідано», «днів на
+    // роботі», «разів проспав»). Ставимо ЗА ПОРЯДКОМ, бо порядок дій у ранковій
+    // картці жорстко заданий інструкцією.
+    const MORNING_COUNTERS = ['lectures', 'work', 'sleepIns'];
+
+    const choices = card.choices.slice(0, 3).map((choice, i) => {
+        const src = choice.effects || {};
+        const effects = {};
+        // беремо тільки відомі шкали — вигадані ШІ поля ігноруємо
+        for (const stat of ['energy', 'mental', 'social', 'study']) {
+            if (src[stat]) effects[stat] = clamp(src[stat], MAX_STAT_CHANGE);
+        }
+        if (src.money) effects.money = clamp(src.money, MAX_MONEY_CHANGE);
+
+        const out = {
+            label: String(choice.label || 'Хай буде').slice(0, 60),
+            result: String(choice.result || 'Сталося як сталося.').slice(0, 300),
+            effects,
+        };
+        if (isMorning && MORNING_COUNTERS[i]) out.count = MORNING_COUNTERS[i];
+        return out;
+    });
+
+    return {
+        id: `ai_${Date.now()}`, // унікальний номер, щоб двигун карток не плутався
+        ai: true,               // позначка «цю картку вигадав ШІ»
+        topic: topicKey,        // тема — гра запам'ятає, щоб не повторювати
+        ...(isMorning ? { morning: true } : {}),
+        text: String(card.text).slice(0, 400),
+        choices,
+    };
 }
 
 // ============================================
@@ -640,8 +663,8 @@ function sanitizeCard(card, topicKey, isMorning) {
 // Звідки дозволено звертатись. Додай сюди свій домен, якщо переїдеш.
 // Порожній Origin (null) — це гра, відкрита локально файлом (file://).
 const ALLOWED_ORIGINS = [
-  'https://mitsu-oi.github.io', // гра на GitHub Pages
-  'null',                        // локальний запуск подвійним кліком
+    'https://mitsu-oi.github.io', // гра на GitHub Pages
+    'null',                        // локальний запуск подвійним кліком
 ];
 
 // Скільки запитів на добу приймаємо ВСЬОГО (захист ліміту Gemini).
@@ -660,24 +683,24 @@ const MAX_MEMORY_LEN = 120;
 // Тепер не '*', а тільки наші адреси — щоб чужа сторінка не могла
 // смикати скриньку від імені свого гравця.
 function corsFor(request) {
-  const origin = request.headers.get('Origin') || 'null';
-  const ok = ALLOWED_ORIGINS.includes(origin);
-  return {
-    headers: {
-      'Access-Control-Allow-Origin': ok ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Vary': 'Origin',
-    },
-    ok,
-  };
+    const origin = request.headers.get('Origin') || 'null';
+    const ok = ALLOWED_ORIGINS.includes(origin);
+    return {
+        headers: {
+            'Access-Control-Allow-Origin': ok ? origin : ALLOWED_ORIGINS[0],
+            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Vary': 'Origin',
+        },
+        ok,
+    };
 }
 
 const json = (body, status = 200, cors = {}) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors },
-  });
+    new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors },
+    });
 
 // ---------- ЧИСТКА ВХІДНИХ ДАНИХ ----------
 // Нічому, що прийшло ззовні, не віримо. Беремо ТІЛЬКИ відомі поля,
@@ -686,160 +709,160 @@ const json = (body, status = 200, cors = {}) =>
 
 // текст із гри: ріжемо довжину і прибираємо все, чим ламають промпти
 function cleanText(v, max = MAX_MEMORY_LEN) {
-  if (typeof v !== 'string') return '';
-  return v
-    .replace(/[\r\n\t]+/g, ' ')   // переноси рядків — щоб не «вийти» з блоку
-    .replace(/[«»"'`]+/g, '')      // лапки — щоб не закрити наші
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
+    if (typeof v !== 'string') return '';
+    return v
+        .replace(/[\r\n\t]+/g, ' ')   // переноси рядків — щоб не «вийти» з блоку
+        .replace(/[«»"'`]+/g, '')      // лапки — щоб не закрити наші
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, max);
 }
 
 // число в межах
 function cleanNum(v, min, max, dflt) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return dflt;
-  return Math.max(min, Math.min(max, Math.round(n)));
+    const n = Number(v);
+    if (!Number.isFinite(n)) return dflt;
+    return Math.max(min, Math.min(max, Math.round(n)));
 }
 
 // одне зі списку дозволених
 function cleanEnum(v, allowed, dflt) {
-  return allowed.includes(v) ? v : dflt;
+    return allowed.includes(v) ? v : dflt;
 }
 
 function sanitizeState(raw) {
-  const s = raw && typeof raw === 'object' ? raw : {};
-  const stats = s.stats && typeof s.stats === 'object' ? s.stats : {};
+    const s = raw && typeof raw === 'object' ? raw : {};
+    const stats = s.stats && typeof s.stats === 'object' ? s.stats : {};
 
-  const memoryItems = (arr, map) =>
-    (Array.isArray(arr) ? arr : []).slice(0, MAX_MEMORY_ITEMS).map(map).filter(Boolean);
+    const memoryItems = (arr, map) =>
+        (Array.isArray(arr) ? arr : []).slice(0, MAX_MEMORY_ITEMS).map(map).filter(Boolean);
 
-  return {
-    day: cleanNum(s.day, 1, 30, 1),
-    phase: cleanEnum(s.phase, ['morning', 'day', 'evening'], 'day'),
-    isWeekend: s.isWeekend === true,
-    dayMode: cleanEnum(s.dayMode, ['university', 'work', 'home'], 'home'),
-    stats: {
-      money: cleanNum(stats.money, 0, 99999, 0),
-      energy: cleanNum(stats.energy, 0, 100, 50),
-      mental: cleanNum(stats.mental, 0, 100, 50),
-      social: cleanNum(stats.social, 0, 100, 50),
-      study: cleanNum(stats.study, 0, 100, 50),
-    },
-    // теми — лише ті, що справді існують у нашому списку
-    recentTopics: memoryItems(s.recentTopics, (t) =>
-      TOPICS.some((x) => x.key === t) ? t : null),
-    recentTexts: memoryItems(s.recentTexts, (t) => cleanText(t) || null),
-    recentChoices: memoryItems(s.recentChoices, (c) => {
-      if (!c || typeof c !== 'object') return null;
-      const situation = cleanText(c.situation);
-      const chose = cleanText(c.chose, 80);
-      return situation || chose ? { situation, chose } : null;
-    }),
-  };
+    return {
+        day: cleanNum(s.day, 1, 30, 1),
+        phase: cleanEnum(s.phase, ['morning', 'day', 'evening'], 'day'),
+        isWeekend: s.isWeekend === true,
+        dayMode: cleanEnum(s.dayMode, ['university', 'work', 'home'], 'home'),
+        stats: {
+            money: cleanNum(stats.money, 0, 99999, 0),
+            energy: cleanNum(stats.energy, 0, 100, 50),
+            mental: cleanNum(stats.mental, 0, 100, 50),
+            social: cleanNum(stats.social, 0, 100, 50),
+            study: cleanNum(stats.study, 0, 100, 50),
+        },
+        // теми — лише ті, що справді існують у нашому списку
+        recentTopics: memoryItems(s.recentTopics, (t) =>
+            TOPICS.some((x) => x.key === t) ? t : null),
+        recentTexts: memoryItems(s.recentTexts, (t) => cleanText(t) || null),
+        recentChoices: memoryItems(s.recentChoices, (c) => {
+            if (!c || typeof c !== 'object') return null;
+            const situation = cleanText(c.situation);
+            const chose = cleanText(c.chose, 80);
+            return situation || chose ? { situation, chose } : null;
+        }),
+    };
 }
 
 // ============================================
 // ГОЛОВНЕ: сюди приходить кожен запит від гри
 // ============================================
 export default {
-  async fetch(request, env) {
-    // Хто стукає і чи можна йому. cors.headers підмішуємо В КОЖНУ відповідь —
-    // без них браузер заблокує гру, навіть якщо сервер усе зробив правильно.
-    const cors = corsFor(request);
+    async fetch(request, env) {
+        // Хто стукає і чи можна йому. cors.headers підмішуємо В КОЖНУ відповідь —
+        // без них браузер заблокує гру, навіть якщо сервер усе зробив правильно.
+        const cors = corsFor(request);
 
-    // Браузер спершу питає «а мені можна?» — відповідаємо заздалегідь
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: cors.headers });
-    }
-
-    // Відкрив адресу в браузері — покажемо, що скринька жива
-    if (request.method === 'GET') {
-      const url = new URL(request.url);
-
-      // Додай /models до адреси — покаже, які моделі доступні саме твоєму ключу.
-      // Потрібно, коли Google закриває стару модель: беремо назву звідси і
-      // вписуємо в MODEL угорі файлу.
-      if (url.pathname === '/models') {
-        try {
-          const res = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models',
-            { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } },
-          );
-          const data = await res.json();
-          const available = (data.models || [])
-            .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-            .map((m) => m.name.replace('models/', ''));
-          return json({ current: MODEL, available }, 200, cors.headers);
-        } catch (error) {
-          return json({ error: String(error.message || error) }, 500, cors.headers);
+        // Браузер спершу питає «а мені можна?» — відповідаємо заздалегідь
+        if (request.method === 'OPTIONS') {
+            return new Response(null, { headers: cors.headers });
         }
-      }
 
-      return json({ ok: true, message: 'Поштова скринька StudLife працює 🎮', model: MODEL }, 200, cors.headers);
-    }
+        // Відкрив адресу в браузері — покажемо, що скринька жива
+        if (request.method === 'GET') {
+            const url = new URL(request.url);
 
-    if (request.method !== 'POST') {
-      return json({ error: 'Сюди треба надсилати POST' }, 405, cors.headers);
-    }
+            // Додай /models до адреси — покаже, які моделі доступні саме твоєму ключу.
+            // Потрібно, коли Google закриває стару модель: беремо назву звідси і
+            // вписуємо в MODEL угорі файлу.
+            if (url.pathname === '/models') {
+                try {
+                    const res = await fetch(
+                        'https://generativelanguage.googleapis.com/v1beta/models',
+                        { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } },
+                    );
+                    const data = await res.json();
+                    const available = (data.models || [])
+                        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+                        .map((m) => m.name.replace('models/', ''));
+                    return json({ current: MODEL, available }, 200, cors.headers);
+                } catch (error) {
+                    return json({ error: String(error.message || error) }, 500, cors.headers);
+                }
+            }
 
-    // ---------- 🔒 захист ----------
+            return json({ ok: true, message: 'Поштова скринька StudLife працює 🎮', model: MODEL }, 200, cors.headers);
+        }
 
-    // 1. Приймаємо запити ТІЛЬКИ з наших адрес.
-    // Це не броня (заголовок можна підробити), але відсіює чужі сайти,
-    // які схотіли б смикати скриньку за наш рахунок.
-    if (!cors.ok) {
-      return json({ error: 'Запити приймаються лише з гри' }, 403, cors.headers);
-    }
+        if (request.method !== 'POST') {
+            return json({ error: 'Сюди треба надсилати POST' }, 405, cors.headers);
+        }
 
-    // 1б. Запит має бути СПРАВДІ З БРАУЗЕРА.
-    //
-    // Проблема: коли гра відкрита з диска (подвійним кліком по index.html),
-    // браузер не надсилає адреси — і Postman виглядає точно так само.
-    // Тому дивимось на службові заголовки Sec-Fetch-*: браузер додає їх САМ,
-    // і зі сторінки їх підробити неможливо — це заборонено правилами вебу.
-    //
-    // ⚠️ Чесно: це не броня, а вища планка. Той, хто знає про ці заголовки,
-    // допише їх у curl і пройде. Повністю закриє лише вхід за паролем —
-    // саме тому ми й переносимо все на бекенд (backend/).
-    const fetchMode = request.headers.get('Sec-Fetch-Mode');
-    if (!fetchMode) {
-      return json({ error: 'Запити приймаються лише з гри' }, 403, cors.headers);
-    }
+        // ---------- 🔒 захист ----------
 
-    // 2. Обмежуємо розмір запиту: стану гри вистачає ~2 КБ.
-    // Без цього можна було б надіслати мегабайт тексту й спалити наші
-    // токени входу одним запитом.
-    const length = Number(request.headers.get('Content-Length') || 0);
-    if (length > MAX_BODY) {
-      return json({ error: 'Забагато даних у запиті' }, 413, cors.headers);
-    }
+        // 1. Приймаємо запити ТІЛЬКИ з наших адрес.
+        // Це не броня (заголовок можна підробити), але відсіює чужі сайти,
+        // які схотіли б смикати скриньку за наш рахунок.
+        if (!cors.ok) {
+            return json({ error: 'Запити приймаються лише з гри' }, 403, cors.headers);
+        }
 
-    try {
-      const raw = await request.text();
-      if (raw.length > MAX_BODY) {
-        return json({ error: 'Забагато даних у запиті' }, 413, cors.headers);
-      }
+        // 1б. Запит має бути СПРАВДІ З БРАУЗЕРА.
+        //
+        // Проблема: коли гра відкрита з диска (подвійним кліком по index.html),
+        // браузер не надсилає адреси — і Postman виглядає точно так само.
+        // Тому дивимось на службові заголовки Sec-Fetch-*: браузер додає їх САМ,
+        // і зі сторінки їх підробити неможливо — це заборонено правилами вебу.
+        //
+        // ⚠️ Чесно: це не броня, а вища планка. Той, хто знає про ці заголовки,
+        // допише їх у curl і пройде. Повністю закриє лише вхід за паролем —
+        // саме тому ми й переносимо все на бекенд (backend/).
+        const fetchMode = request.headers.get('Sec-Fetch-Mode');
+        if (!fetchMode) {
+            return json({ error: 'Запити приймаються лише з гри' }, 403, cors.headers);
+        }
 
-      // 3. ЧИСТКА: беремо тільки відомі поля й обрізаємо довжини.
-      // Усе інше, що надіслали, просто не існує для решти коду —
-      // зокрема й спроби підсунути моделі свої інструкції.
-      const state = sanitizeState(JSON.parse(raw));
+        // 2. Обмежуємо розмір запиту: стану гри вистачає ~2 КБ.
+        // Без цього можна було б надіслати мегабайт тексту й спалити наші
+        // токени входу одним запитом.
+        const length = Number(request.headers.get('Content-Length') || 0);
+        if (length > MAX_BODY) {
+            return json({ error: 'Забагато даних у запиті' }, 413, cors.headers);
+        }
 
-      const { prompt, topicKey, morning } = buildPrompt(state);
+        try {
+            const raw = await request.text();
+            if (raw.length > MAX_BODY) {
+                return json({ error: 'Забагато даних у запиті' }, 413, cors.headers);
+            }
 
-      // 4. Модель і «думання» задає СЕРВЕР, а не той, хто прислав запит:
-      // інакше можна було б обрати дорожчу модель або поставити
-      // необмежене «думання» й палити токени.
-      const { card: card0, model: usedModel } = await callLLM(prompt, env);
+            // 3. ЧИСТКА: беремо тільки відомі поля й обрізаємо довжини.
+            // Усе інше, що надіслали, просто не існує для решти коду —
+            // зокрема й спроби підсунути моделі свої інструкції.
+            const state = sanitizeState(JSON.parse(raw));
 
-      return json({
-        card: sanitizeCard(card0, topicKey, morning),
-        usedModel, // яка модель насправді впоралась (могла спрацювати запасна)
-      }, 200, cors.headers);
-    } catch (error) {
-      // Гра на цей випадок має запасний варіант — візьме звичайну картку
-      return json({ error: String(error.message || error) }, 500, cors.headers);
-    }
-  },
+            const { prompt, topicKey, morning } = buildPrompt(state);
+
+            // 4. Модель і «думання» задає СЕРВЕР, а не той, хто прислав запит:
+            // інакше можна було б обрати дорожчу модель або поставити
+            // необмежене «думання» й палити токени.
+            const { card: card0, model: usedModel } = await callLLM(prompt, env);
+
+            return json({
+                card: sanitizeCard(card0, topicKey, morning),
+                usedModel, // яка модель насправді впоралась (могла спрацювати запасна)
+            }, 200, cors.headers);
+        } catch (error) {
+            // Гра на цей випадок має запасний варіант — візьме звичайну картку
+            return json({ error: String(error.message || error) }, 500, cors.headers);
+        }
+    },
 };
